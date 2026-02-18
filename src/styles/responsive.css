@@ -1,0 +1,435 @@
+/* ===== RESPONSIVE STYLES ===== */
+
+/* Tablets and small desktops */
+@media (max-width: 992px) {
+    .app-layout {
+        flex-direction: column;
+    }
+    
+    .sidebar {
+        width: 100%;
+        padding: 10px 0;
+    }
+    
+    .sidebar-menu {
+        display: flex;
+        overflow-x: auto;
+        padding: 0 10px;
+    }
+    
+    .menu-item {
+        flex-shrink: 0;
+        margin-bottom: 0;
+    }
+    
+    .menu-item a {
+        padding: 10px 15px;
+        white-space: nowrap;
+    }
+    
+    .menu-divider, 
+    .menu-title {
+        display: none;
+    }
+    
+    .dashboard-sections, 
+    .stats-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .chat-container {
+        flex-direction: column;
+        height: auto;
+    }
+    
+    .chat-sidebar {
+        width: 100%;
+        height: 200px;
+    }
+    
+    .dev-tools-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Mobile devices */
+@media (max-width: 768px) {
+    .stats-cards, 
+    .projects-grid, 
+    .tasks-container, 
+    .repos-grid, 
+    .dev-tools-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+    
+    .page-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .pipeline-visual {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 30px;
+    }
+    
+    .pipeline-visual::before {
+        display: none;
+    }
+    
+    .pipeline-stage {
+        width: 120px;
+    }
+    
+    .docs-container {
+        flex-direction: column;
+    }
+    
+    .docs-sidebar {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid #eee;
+        padding-right: 0;
+        padding-bottom: 20px;
+    }
+    
+    .env-detail {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+}
+
+/* Small mobile devices */
+@media (max-width: 576px) {
+    .auth-box {
+        max-width: 100%;
+    }
+    
+    .user-type-selector {
+        flex-direction: column;
+    }
+    
+    .header-content {
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+    }
+    
+    .user-info {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .logout-actions {
+        flex-direction: column;
+    }
+    
+    .modal {
+        width: 95%;
+    }
+    
+    .settings-tabs {
+        flex-wrap: wrap;
+    }
+    
+    .settings-tab {
+        flex: 1 0 50%;
+        text-align: center;
+        padding: 10px;
+    }
+    
+    .settings-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .chart-bar {
+        flex-wrap: wrap;
+        height: auto;
+        padding: 15px 10px;
+    }
+    
+    .chart-bar-item {
+        min-width: 60px;
+    }
+    
+    .project-meta {
+        flex-direction: column;
+        gap: 5px;
+    }
+}
+
+/* Print styles */
+@media print {
+    .sidebar,
+    .app-header,
+    .page-actions,
+    .btn,
+    .modal-overlay {
+        display: none !important;
+    }
+    
+    .app-layout {
+        display: block;
+    }
+    
+    .main-content {
+        padding: 0;
+        background-color: white;
+    }
+    
+    .dashboard-card,
+    .project-card,
+    .task-card,
+    .repo-card,
+    .env-card {
+        break-inside: avoid;
+        box-shadow: none;
+        border: 1px solid #ddd;
+    }
+}
+
+/* Dark theme support */
+@media (prefers-color-scheme: dark) {
+    [data-theme="auto"] {
+        --primary-color: #4a9c8c;
+        --dark-color: #f8f9fa;
+        --light-color: #343a40;
+        --gray-color: #adb5bd;
+        background-color: #1e1e1e;
+        color: #f8f9fa;
+    }
+    
+    [data-theme="auto"] .dashboard-card,
+    [data-theme="auto"] .project-card,
+    [data-theme="auto"] .task-card,
+    [data-theme="auto"] .repo-card,
+    [data-theme="auto"] .env-card,
+    [data-theme="auto"] .pipeline-container,
+    [data-theme="auto"] .chat-container,
+    [data-theme="auto"] .docs-container,
+    [data-theme="auto"] .settings-container,
+    [data-theme="auto"] .users-table-container {
+        background-color: #2d2d30;
+        color: #f8f9fa;
+    }
+}
+
+/* Height-based media queries */
+@media (max-height: 600px) {
+    .auth-container {
+        min-height: 100%;
+        padding: 10px;
+    }
+    
+    .auth-box {
+        max-height: 95vh;
+        overflow-y: auto;
+    }
+    
+    .chat-container {
+        height: 400px;
+    }
+}
+
+/* Touch devices */
+@media (hover: none) and (pointer: coarse) {
+    .btn:hover,
+    .menu-item a:hover,
+    .project-card:hover,
+    .stat-card:hover {
+        transform: none;
+    }
+    
+    .task-card {
+        cursor: default;
+    }
+    
+    .task-card[draggable="true"] {
+        cursor: grab;
+    }
+    
+    .task-card[draggable="true"]:active {
+        cursor: grabbing;
+    }
+}
+
+/* High-resolution displays */
+@media (min-resolution: 192dpi) {
+    .user-avatar,
+    .team-avatar,
+    .chat-user-avatar,
+    .activity-icon,
+    .dev-tool-icon,
+    .help-icon,
+    .logout-icon {
+        background-size: contain;
+    }
+}
+
+/* Landscape orientation */
+@media (orientation: landscape) and (max-height: 500px) {
+    .auth-container {
+        padding: 10px;
+    }
+    
+    .auth-header {
+        padding: 15px 20px;
+    }
+    
+    .auth-header h1 {
+        font-size: 24px;
+        margin-bottom: 5px;
+    }
+    
+    .auth-form {
+        padding: 20px;
+    }
+    
+    .form-group {
+        margin-bottom: 12px;
+    }
+    
+    .dev-terminal {
+        max-height: 250px;
+    }
+    
+    .code-editor .editor-content {
+        max-height: 250px;
+    }
+}
+
+/* Foldable devices */
+@media (max-width: 280px) {
+    .container {
+        padding: 0 10px;
+    }
+    
+    .page-title {
+        font-size: 20px;
+    }
+    
+    .btn {
+        padding: 8px 12px;
+        font-size: 14px;
+    }
+    
+    .btn-sm {
+        padding: 6px 10px;
+        font-size: 12px;
+    }
+    
+    .stat-card {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .project-header {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+    }
+    
+    .project-footer {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .project-team {
+        justify-content: center;
+    }
+}
+
+/* Tablet-specific improvements */
+@media (min-width: 768px) and (max-width: 1024px) and (orientation: portrait) {
+    .projects-grid,
+    .tasks-container,
+    .repos-grid,
+    .environments-grid,
+    .dev-tools-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .stats-cards {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .dashboard-sections {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Ensure modals are responsive */
+@media (max-width: 600px) {
+    .modal {
+        width: 95%;
+        margin: 10px;
+    }
+    
+    .modal-header,
+    .modal-body,
+    .modal-footer {
+        padding: 15px;
+    }
+    
+    .modal-footer {
+        flex-direction: column;
+    }
+    
+    .modal-footer .btn {
+        width: 100%;
+        margin: 5px 0;
+    }
+}
+
+/* Fix for very small devices */
+@media (max-width: 360px) {
+    .page-actions {
+        flex-wrap: wrap;
+    }
+    
+    .page-actions .btn {
+        flex: 1 0 100%;
+        margin-bottom: 10px;
+    }
+    
+    .user-info {
+        width: 100%;
+    }
+    
+    .user-info .btn {
+        width: 100%;
+    }
+    
+    .repo-stats {
+        flex-wrap: wrap;
+    }
+    
+    .pipeline-actions {
+        flex-wrap: wrap;
+    }
+    
+    .pipeline-actions .btn {
+        flex: 1 0 100%;
+    }
+}
+
+/* Smooth scrolling for all devices */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
