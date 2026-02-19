@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Logs
 logs
 *.log
@@ -22,3 +23,13 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+=======
+# Dossier de dépendances (Très lourd, ne jamais envoyer sur GitHub)
+node_modules/
+# Dossier de compilation
+/dist/
+# Fichiers de configuration locale
+.vscode/
+.idea/
+.DS_Store
+>>>>>>> 92fe45e1d45cd4aa663079d6dd358875e0391d50
