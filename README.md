@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # DevEnviron - Plateforme de Développement Environnemental
 
 DevEnviron est une plateforme de développement collaborative complète qui permet aux équipes de gérer des projets, des tâches, des pipelines CI/CD, des dépôts Git, des environnements, et bien plus encore.
@@ -32,3 +33,6 @@ DevEnviron est une plateforme de développement collaborative complète qui perm
 ```bash
 git clone https://github.com/votre-org/devenviron-react.git
 cd devenviron-react
+=======
+# mon-project-app
+>>>>>>> 92fe45e1d45cd4aa663079d6dd358875e0391d50
