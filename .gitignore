@@ -1,35 +1,6 @@
-<<<<<<< HEAD
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-=======
-# Dossier de dépendances (Très lourd, ne jamais envoyer sur GitHub)
 node_modules/
-# Dossier de compilation
-/dist/
-# Fichiers de configuration locale
-.vscode/
-.idea/
-.DS_Store
->>>>>>> 92fe45e1d45cd4aa663079d6dd358875e0391d50
+.env
+.env.local
+.env.production
+build/
+dist/
