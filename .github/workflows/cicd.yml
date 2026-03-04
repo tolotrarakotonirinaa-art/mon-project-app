@@ -4,75 +4,66 @@ on:
   push:
     branches:
       - staging
-      - main
 
 jobs:
 
-  # ── Déploiement sur serveur TEST ──────────────────
   deploy-test:
-    if: github.ref == 'refs/heads/staging'
     runs-on: ubuntu-latest
     environment: staging
     steps:
-      - name: Deploy sur serveur TEST
+      - name: Deploy sur serveur TEST (port 8080)
         uses: appleboy/ssh-action@v1.0.0
         with:
-          host: ${{ secrets.TEST_SERVER_IP }}
-          username: deployer
-          key: ${{ secrets.TEST_SSH_KEY }}
+          host: ${{ secrets.SERVER_IP }}
+          username: tolotralucas
+          key: ${{ secrets.SSH_KEY }}
           port: 22
           script: |
             cd /srv/test/app
+            git fetch --all
+            git checkout staging
             git pull origin staging
             cd /srv/test
-            docker compose up -d --build
-            echo "✅ Serveur TEST mis à jour"
+            docker compose up -d --build --remove-orphans
+            echo "✅ TEST déployé sur port 8080"
 
-  # ── Validation manuelle avant production ─────────
   validate:
     needs: deploy-test
     runs-on: ubuntu-latest
     environment:
       name: production-approval
     steps:
-      - run: echo "✅ Validé - déploiement en production"
+      - run: echo "✅ Validé - promotion vers Production"
 
-  # ── Déploiement sur serveur PROD ──────────────────
   deploy-prod:
     needs: validate
-    if: github.ref == 'refs/heads/staging'
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - name: Deploy sur serveur PROD
+      - name: Deploy sur serveur PROD (port 80)
         uses: appleboy/ssh-action@v1.0.0
         with:
-          host: ${{ secrets.PROD_SERVER_IP }}
-          username: deployer
-          key: ${{ secrets.PROD_SSH_KEY }}
+          host: ${{ secrets.SERVER_IP }}
+          username: tolotralucas
+          key: ${{ secrets.SSH_KEY }}
           port: 22
           script: |
             cd /srv/prod/app
-            git pull origin main
+            git fetch --all
+            git checkout main
+            git merge origin/staging
             cd /srv/prod
-            docker compose -f docker-compose.prod.yml up -d --build
-            echo "✅ Serveur PROD mis à jour"
+            docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
+            echo "✅ PROD déployé sur port 80"
 
       - name: Supprimer APK du TEST
         uses: appleboy/ssh-action@v1.0.0
         with:
-          host: ${{ secrets.TEST_SERVER_IP }}
-          username: deployer
-          key: ${{ secrets.TEST_SSH_KEY }}
+          host: ${{ secrets.SERVER_IP }}
+          username: tolotralucas
+          key: ${{ secrets.SSH_KEY }}
           port: 22
           script: |
             rm -rf /srv/test/releases/*
-            chmod 000 /srv/test/releases
+            chmod 000 /srv/test/releases 2>/dev/null || true
             echo "🔒 APK supprimé du TEST"
-
-      - name: Créer Release GitHub
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: v${{ github.run_number }}
-          name: "Version ${{ github.run_number }}"
-          body: "Nouvelle version déployée en production"
