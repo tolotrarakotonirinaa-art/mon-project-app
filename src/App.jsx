@@ -78,7 +78,7 @@ const AppContent = () => {
         </Layout>
     );
 };
-
+// VERSION 2.0 - Pipeline CI/CD operationnel
 const App = () => {
     return (
         <AuthProvider>
