@@ -8,62 +8,44 @@ on:
 jobs:
 
   deploy-test:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     environment: staging
     steps:
-      - name: Deploy sur serveur TEST (port 8080)
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.SERVER_IP }}
-          username: tolotralucas
-          key: ${{ secrets.SSH_KEY }}
-          port: 22
-          script: |
-            cd /srv/test/app
-            git fetch --all
-            git checkout staging
-            git pull origin staging
-            cd /srv/test
-            docker compose up -d --build --remove-orphans
-            echo "✅ TEST déployé sur port 8080"
+      - name: Deploy sur serveur TEST
+        run: |
+          cd /srv/test/app
+          git fetch --all
+          git checkout staging
+          git pull origin staging
+          cd /srv/test
+          docker compose up -d --build --remove-orphans
+          echo "TEST déployé sur port 8080"
 
   validate:
     needs: deploy-test
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     environment:
       name: production-approval
     steps:
-      - run: echo "✅ Validé - promotion vers Production"
+      - run: echo "Validé - promotion vers Production"
 
   deploy-prod:
     needs: validate
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     environment: production
     steps:
-      - name: Deploy sur serveur PROD (port 80)
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.SERVER_IP }}
-          username: tolotralucas
-          key: ${{ secrets.SSH_KEY }}
-          port: 22
-          script: |
-            cd /srv/prod/app
-            git fetch --all
-            git checkout main
-            git merge origin/staging
-            cd /srv/prod
-            docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
-            echo "✅ PROD déployé sur port 80"
+      - name: Deploy sur serveur PROD
+        run: |
+          cd /srv/prod/app
+          git fetch --all
+          git checkout main
+          git merge origin/staging
+          cd /srv/prod
+          docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
+          echo "PROD déployé sur port 80"
 
       - name: Supprimer APK du TEST
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.SERVER_IP }}
-          username: tolotralucas
-          key: ${{ secrets.SSH_KEY }}
-          port: 22
-          script: |
-            rm -rf /srv/test/releases/*
-            chmod 000 /srv/test/releases 2>/dev/null || true
-            echo "🔒 APK supprimé du TEST"
+        run: |
+          rm -rf /srv/test/releases/*
+          chmod 000 /srv/test/releases 2>/dev/null || true
+          echo "APK supprimé du TEST"
