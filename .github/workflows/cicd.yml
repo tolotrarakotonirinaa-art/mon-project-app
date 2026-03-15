@@ -8,7 +8,7 @@ on:
 jobs:
 
   deploy-test:
-    runs-on: self-hosted
+    runs-on: [self-hosted, runner-test]
     environment: staging
     steps:
       - name: Deploy sur serveur TEST
@@ -23,7 +23,7 @@ jobs:
 
   validate:
     needs: deploy-test
-    runs-on: self-hosted
+    runs-on: [self-hosted, runner-test]
     environment:
       name: production-approval
     steps:
@@ -31,7 +31,7 @@ jobs:
 
   deploy-prod:
     needs: validate
-    runs-on: self-hosted
+    runs-on: [self-hosted, tolotra-VirtualBox]
     environment: production
     steps:
       - name: Deploy sur serveur PROD
