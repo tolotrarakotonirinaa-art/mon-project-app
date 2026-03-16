@@ -2,32 +2,44 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ staging, main ]
+    branches: [ main, staging ]
 
 jobs:
   deploy-staging:
     if: github.ref == 'refs/heads/staging'
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
+
       - name: Deploy to Staging
         run: |
-          mkdir -p dist/apk
-          echo "APK de TEST" > dist/apk/app-test.apk
+          # Copie vers le dossier de test
           sudo rm -rf /var/www/mon-project-app/staging/*
           sudo cp -R . /var/www/mon-project-app/staging/
+          
+          # Simulation/Génération de l'APK de test
+          sudo mkdir -p /var/www/mon-project-app/staging/dist/apk/
+          echo "APK Test Version" > app-test.apk
+          sudo mv app-test.apk /var/www/mon-project-app/staging/dist/apk/
 
   deploy-production:
+    needs: deploy-staging
     if: github.ref == 'refs/heads/main'
     runs-on: self-hosted
-    environment: production  # Active la validation manuelle
+    environment: production
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
+
       - name: Deploy to Production
         run: |
-          # 1. Copier vers la prod
+          # 1. Mise à jour des fichiers web officiels
           sudo rm -rf /var/www/mon-project-app/production/*
           sudo cp -R . /var/www/mon-project-app/production/
+
+          # 2. Transfert de l'APK du Staging vers la Production
+          # On récupère l'APK validé en test pour le mettre à disposition des clients
+          sudo cp /var/www/mon-project-app/staging/dist/apk/app-test.apk /var/www/mon-project-app/production/dist/apk/app-prod.apk
           
-          # 2. Nettoyer l'APK du serveur de TEST (Sécurité)
-          sudo rm -f /var/www/mon-project-app/staging/dist/apk/app-test.apk
+          echo "Succès : L'APK est maintenant en ligne pour les clients."
