@@ -1,28 +1,33 @@
-name: Deploy to Staging
+name: CI/CD Pipeline
 
 on:
   push:
-    branches:
-      - staging
+    branches: [ staging, main ]
 
 jobs:
-  deploy:
+  deploy-staging:
+    if: github.ref == 'refs/heads/staging'
     runs-on: self-hosted
     steps:
-      - name: Récupérer le code
-        uses: actions/checkout@v3
-
-      - name: Simuler la création de l'APK
+      - uses: actions/checkout@v3
+      - name: Deploy to Staging
         run: |
           mkdir -p dist/apk
-          echo "APK de test - Lucas" > dist/apk/app-test.apk
-
-      - name: Déploiement vers Nginx
-        run: |
-          # On vide l'ancien contenu et on copie le nouveau
+          echo "APK de TEST" > dist/apk/app-test.apk
           sudo rm -rf /var/www/mon-project-app/staging/*
           sudo cp -R . /var/www/mon-project-app/staging/
-          
-      - name: Permissions
+
+  deploy-production:
+    if: github.ref == 'refs/heads/main'
+    runs-on: self-hosted
+    environment: production  # Active la validation manuelle
+    steps:
+      - uses: actions/checkout@v3
+      - name: Deploy to Production
         run: |
-          sudo chown -R www-data:www-data /var/www/mon-project-app/staging
+          # 1. Copier vers la prod
+          sudo rm -rf /var/www/mon-project-app/production/*
+          sudo cp -R . /var/www/mon-project-app/production/
+          
+          # 2. Nettoyer l'APK du serveur de TEST (Sécurité)
+          sudo rm -f /var/www/mon-project-app/staging/dist/apk/app-test.apk
