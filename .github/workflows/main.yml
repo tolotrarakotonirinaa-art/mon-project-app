@@ -1,0 +1,40 @@
+name: CI/CD mon-project-app
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy-staging:
+    name: Build and Deploy to Test (8080)
+    runs-on: self-hosted
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install and Build React
+        run: |
+          npm install
+          npm run build --if-present
+          
+      - name: Prepare APK Folder
+        run: |
+          mkdir -p dist/apk
+          # Ity echo ity dia solon'ny APK-nao aloha mba hanamarinana ny architecture
+          echo "APK Build Success" > dist/apk/mon-app.apk 
+
+      - name: Copy to Staging Folder
+        run: |
+          rm -rf /var/www/mon-project-app/staging/*
+          cp -r dist/* /var/www/mon-project-app/staging/
+
+  deploy-production:
+    name: Promote to Production (80)
+    needs: deploy-staging
+    runs-on: self-hosted
+    steps:
+      - name: Copy Staging to Production
+        run: |
+          sudo rm -rf /var/www/mon-project-app/production/*
+          sudo cp -r /var/www/mon-project-app/staging/* /var/www/mon-project-app/production/
+          sudo chown -R deployer:deployer /var/www/mon-project-app/production/
