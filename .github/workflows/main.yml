@@ -4,10 +4,6 @@ on:
   push:
     branches: [ main ]
 
-env:
-  # Ity no manala ilay fampitandremana Node 20
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true 
-
 jobs:
   deploy-staging:
     name: Build and Deploy to Test (8080)
@@ -16,25 +12,24 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        # Manampy an'ity dingana ity isika mba hahazoana antoka fa hita ny node
-        run: |
-          node -v
-          npm -v
-
       - name: Install and Build
         run: |
-          # Ampiasao ny --if-present raha toa ka tsy React ilay alefanao
-          npm install --no-audit
+          # Hamarino raha misy npm
+          npm -v || (sudo apt update && sudo apt install -y nodejs npm)
+          npm install
           npm run build --if-present
-          
-      - name: Prepare APK Folder
-        run: |
-          mkdir -p dist/apk
-          echo "APK Build Success" > dist/apk/mon-app.apk 
 
-      - name: Copy to Staging Folder
+      - name: Deploy to Staging Folder
         run: |
-          # Ampiasao ny sudo raha toa ka voa-config ny visudo
+          # Ity baiko ity no mampiseho ny projet ao amin'ny 8080
+          # Ampiasaina ny sudo mba tsy hisy olana amin'ny famafana/fandikana
           sudo rm -rf /var/www/mon-project-app/staging/*
-          sudo cp -r dist/* /var/www/mon-project-app/staging/
+          
+          # Raha React (Vite) dia 'dist' ny folder, raha React (CRA) dia 'build'
+          if [ -d "dist" ]; then
+            sudo cp -r dist/* /var/www/mon-project-app/staging/
+          elif [ -d "build" ]; then
+            sudo cp -r build/* /var/www/mon-project-app/staging/
+          else
+            sudo cp index.html /var/www/mon-project-app/staging/
+          fi
