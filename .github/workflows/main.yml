@@ -4,6 +4,10 @@ on:
   push:
     branches: [ main ]
 
+env:
+  # Ity no manala ilay fampitandremana Node 20
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true 
+
 jobs:
   deploy-staging:
     name: Build and Deploy to Test (8080)
@@ -12,29 +16,25 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install and Build React
+      - name: Setup Node.js
+        # Manampy an'ity dingana ity isika mba hahazoana antoka fa hita ny node
         run: |
-          npm install
+          node -v
+          npm -v
+
+      - name: Install and Build
+        run: |
+          # Ampiasao ny --if-present raha toa ka tsy React ilay alefanao
+          npm install --no-audit
           npm run build --if-present
           
       - name: Prepare APK Folder
         run: |
           mkdir -p dist/apk
-          # Ity echo ity dia solon'ny APK-nao aloha mba hanamarinana ny architecture
           echo "APK Build Success" > dist/apk/mon-app.apk 
 
       - name: Copy to Staging Folder
         run: |
-          rm -rf /var/www/mon-project-app/staging/*
-          cp -r dist/* /var/www/mon-project-app/staging/
-
-  deploy-production:
-    name: Promote to Production (80)
-    needs: deploy-staging
-    runs-on: self-hosted
-    steps:
-      - name: Copy Staging to Production
-        run: |
-          sudo rm -rf /var/www/mon-project-app/production/*
-          sudo cp -r /var/www/mon-project-app/staging/* /var/www/mon-project-app/production/
-          sudo chown -R deployer:deployer /var/www/mon-project-app/production/
+          # Ampiasao ny sudo raha toa ka voa-config ny visudo
+          sudo rm -rf /var/www/mon-project-app/staging/*
+          sudo cp -r dist/* /var/www/mon-project-app/staging/
