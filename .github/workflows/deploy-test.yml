@@ -14,13 +14,13 @@ jobs:
 
       - name: Deploy to Staging
         run: |
-          # Copie vers le dossier de test
+          # 1. Mise à jour des fichiers de test (Port 8080)
           sudo rm -rf /var/www/mon-project-app/staging/*
           sudo cp -R . /var/www/mon-project-app/staging/
           
-          # Simulation/Génération de l'APK de test
+          # 2. Création de l'APK de test (Simulation pour le moment)
           sudo mkdir -p /var/www/mon-project-app/staging/dist/apk/
-          echo "APK Test Version" > app-test.apk
+          echo "Version de test du $(date)" > app-test.apk
           sudo mv app-test.apk /var/www/mon-project-app/staging/dist/apk/
 
   deploy-production:
@@ -34,12 +34,16 @@ jobs:
 
       - name: Deploy to Production
         run: |
-          # 1. Mise à jour des fichiers web officiels
+          # 1. Mise à jour des fichiers officiels (Port 80)
           sudo rm -rf /var/www/mon-project-app/production/*
           sudo cp -R . /var/www/mon-project-app/production/
 
-          # 2. Transfert de l'APK du Staging vers la Production
-          # On récupère l'APK validé en test pour le mettre à disposition des clients
+          # 2. Transfert de l'APK vers la Production (Visible par les clients)
+          # On crée le dossier de destination s'il n'existe pas
+          sudo mkdir -p /var/www/mon-project-app/production/dist/apk/
+          
+          # On COPIE l'APK validé en test vers le dossier de production
+          # Et on le renomme 'app-prod.apk' pour que ce soit clair pour le client
           sudo cp /var/www/mon-project-app/staging/dist/apk/app-test.apk /var/www/mon-project-app/production/dist/apk/app-prod.apk
           
-          echo "Succès : L'APK est maintenant en ligne pour les clients."
+          echo "Succès : L'APK est maintenant disponible pour tous les clients sur le port 80."
