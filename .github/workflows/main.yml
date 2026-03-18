@@ -4,7 +4,12 @@ on:
   push:
     branches: [ main ]
 
+env:
+  # Manala ny fampitandremana momba ny Node.js
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true 
+
 jobs:
+  # --- DINGANA 1: BUILD SY DEPLOY STAGING (Port 8080) ---
   deploy-staging:
     name: Build and Deploy to Test (8080)
     runs-on: self-hosted
@@ -12,31 +17,30 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Install and Build React
         run: |
-          node -v
-          npm -v
-
-      - name: Install and Build
-        run: |
-          npm install
+          npm install --no-audit
           npm run build --if-present
-          
-      - name: Prepare APK Folder
-        run: |
-          mkdir -p dist/apk
-          echo "APK Build Success" > dist/apk/mon-app.apk 
 
-      - name: Copy to Staging Folder
+      - name: Deploy to Staging Folder
         run: |
+          # 1. Fafana tanteraka ny ao amin'ny staging (anisan'izany ilay index.html taloha)
           sudo rm -rf /var/www/mon-project-app/staging/*
-          # Raha toa ka tsy nisy 'dist' niforona dia mampiasa ny folder misy ankehitriny
+          
+          # 2. Adika ny "Build" vaovao (dist na build)
           if [ -d "dist" ]; then
             sudo cp -r dist/* /var/www/mon-project-app/staging/
+          elif [ -d "build" ]; then
+            sudo cp -r build/* /var/www/mon-project-app/staging/
           else
+            # Raha tsy misy folder build dia ny index.html mivantana no adika
             sudo cp index.html /var/www/mon-project-app/staging/
           fi
+          
+          # 3. Amboarina ny fananan'ny Nginx (Permissions)
+          sudo chown -R www-data:www-data /var/www/mon-project-app/staging/
 
+  # --- DINGANA 2: PROMOTION TO PRODUCTION (Port 80) ---
   deploy-production:
     name: Promote to Production (80)
     needs: deploy-staging
@@ -44,6 +48,7 @@ jobs:
     steps:
       - name: Copy Staging to Production
         run: |
+          # Adika ny files efa voadio avy ao amin'ny Staging mankany amin'ny Prod
           sudo rm -rf /var/www/mon-project-app/production/*
           sudo cp -r /var/www/mon-project-app/staging/* /var/www/mon-project-app/production/
           sudo chown -R deployer:deployer /var/www/mon-project-app/production/
