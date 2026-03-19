@@ -18,7 +18,7 @@ jobs:
           git checkout staging
           git pull origin staging
           cd /srv/test
-          docker compose up -d --build --remove-orphans
+          docker compose up -d --remove-orphans
           echo "TEST déployé sur port 8080"
 
   validate:
@@ -41,11 +41,40 @@ jobs:
           git checkout main
           git merge origin/staging
           cd /srv/prod
-          docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
+          docker compose -f docker-compose.prod.yml up -d --remove-orphans
           echo "PROD déployé sur port 80"
 
-      - name: Supprimer APK du TEST
+  cleanup-test:
+    needs: deploy-prod
+    runs-on: [self-hosted, runner-test]
+    steps:
+      - name: Supprimer APK du TEST après promotion
         run: |
           rm -rf /srv/test/releases/*
           chmod 000 /srv/test/releases 2>/dev/null || true
-          echo "APK supprimé du TEST"
+          echo "APK supprimé du TEST - disponible uniquement sur PROD"
+```
+
+---
+
+## Objectif 2 — Travail collaboratif en équipe
+
+### Le principe Git Flow pour plusieurs développeurs
+```
+Développeur 1 (Frontend)
+    → git checkout -b feature/frontend
+    → code le frontend
+    → git push origin feature/frontend
+    → Pull Request vers develop
+
+Développeur 2 (Backend)
+    → git checkout -b feature/backend
+    → code le backend
+    → git push origin feature/backend
+    → Pull Request vers develop
+
+Développeur 3 (Base de données)
+    → git checkout -b feature/database
+    → code la DB
+    → git push origin feature/database
+    → Pull Request vers develop
