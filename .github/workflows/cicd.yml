@@ -1,4 +1,4 @@
-name: CI/CD Dev → Test → Prod
+name: CI/CD Pipeline
 
 on:
   push:
@@ -7,20 +7,35 @@ on:
 
 jobs:
 
+  # ── ÉTAPE 1 : Déploiement automatique sur TEST ──
   deploy-test:
     runs-on: [self-hosted, runner-test]
     environment: staging
     steps:
-      - name: Deploy sur serveur TEST
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Déployer sur serveur TEST
         run: |
+          # Mettre à jour le code
           cd /srv/test/app
           git fetch --all
           git checkout staging
           git pull origin staging
+
+          # Copier APK si présent dans le repo
+          if [ -d "$GITHUB_WORKSPACE/releases" ]; then
+            cp -r $GITHUB_WORKSPACE/releases/* /srv/test/releases/ 2>/dev/null || true
+          fi
+
+          # Redémarrer les conteneurs
           cd /srv/test
           docker compose up -d --remove-orphans
-          echo "TEST déployé sur port 8080"
 
+          echo "TEST déployé sur http://192.168.137.68:8080"
+          echo "APK visible sur http://192.168.137.68:8080/releases/"
+
+  # ── ÉTAPE 2 : Validation manuelle ──
   validate:
     needs: deploy-test
     runs-on: [self-hosted, runner-test]
@@ -29,52 +44,41 @@ jobs:
     steps:
       - run: echo "Validé - promotion vers Production"
 
+  # ── ÉTAPE 3 : Déploiement sur PROD ──
   deploy-prod:
     needs: validate
     runs-on: [self-hosted, tolotra-VirtualBox]
     environment: production
     steps:
-      - name: Deploy sur serveur PROD
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Déployer sur serveur PROD
         run: |
+          # Mettre à jour le code
           cd /srv/prod/app
           git fetch --all
           git checkout main
           git merge origin/staging
+
+          # Copier APK vers PROD
+          if [ -d "$GITHUB_WORKSPACE/releases" ]; then
+            mkdir -p /srv/releases
+            cp -r $GITHUB_WORKSPACE/releases/* /srv/releases/ 2>/dev/null || true
+          fi
+
+          # Redémarrer les conteneurs PROD
           cd /srv/prod
           docker compose -f docker-compose.prod.yml up -d --remove-orphans
-          echo "PROD déployé sur port 80"
 
+          echo "PROD déployé"
+
+  # ── ÉTAPE 4 : Supprimer APK du TEST après promotion ──
   cleanup-test:
     needs: deploy-prod
     runs-on: [self-hosted, runner-test]
     steps:
-      - name: Supprimer APK du TEST après promotion
+      - name: Supprimer APK du TEST
         run: |
-          rm -rf /srv/test/releases/*
-          chmod 000 /srv/test/releases 2>/dev/null || true
-          echo "APK supprimé du TEST - disponible uniquement sur PROD"
-```
-
----
-
-## Objectif 2 — Travail collaboratif en équipe
-
-### Le principe Git Flow pour plusieurs développeurs
-```
-Développeur 1 (Frontend)
-    → git checkout -b feature/frontend
-    → code le frontend
-    → git push origin feature/frontend
-    → Pull Request vers develop
-
-Développeur 2 (Backend)
-    → git checkout -b feature/backend
-    → code le backend
-    → git push origin feature/backend
-    → Pull Request vers develop
-
-Développeur 3 (Base de données)
-    → git checkout -b feature/database
-    → code la DB
-    → git push origin feature/database
-    → Pull Request vers develop
+          bash /srv/test/cleanup-apk.sh
+          echo "APK retiré du TEST - disponible uniquement sur PROD"
