@@ -1,0 +1,57 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - staging
+
+jobs:
+
+  deploy-test:
+    runs-on: [self-hosted, runner-test]
+    environment: staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Copier APK vers TEST
+        run: |
+          if [ -d "$GITHUB_WORKSPACE/releases" ]; then
+            chmod 755 /srv/test/releases
+            cp -r $GITHUB_WORKSPACE/releases/* /srv/test/releases/ 2>/dev/null || true
+          fi
+          echo "APK disponible sur http://192.168.137.68:8080/releases/"
+
+  validate:
+    needs: deploy-test
+    runs-on: [self-hosted, runner-test]
+    environment:
+      name: production-approval
+    steps:
+      - run: echo "Validé - promotion vers Production"
+
+  deploy-prod:
+    needs: validate
+    runs-on: [self-hosted, tolotra-VirtualBox]
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Copier APK vers PROD
+        run: |
+          if [ -d "$GITHUB_WORKSPACE/releases" ]; then
+            mkdir -p /srv/releases
+            cp -r $GITHUB_WORKSPACE/releases/* /srv/releases/ 2>/dev/null || true
+          fi
+          echo "APK disponible sur http://192.168.137.153/releases/"
+
+  cleanup-test:
+    needs: deploy-prod
+    runs-on: [self-hosted, runner-test]
+    steps:
+      - name: Supprimer APK du TEST
+        run: |
+          rm -rf /srv/test/releases/*
+          chmod 000 /srv/test/releases 2>/dev/null || true
+          echo "APK retiré du TEST"
