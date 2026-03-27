@@ -7,45 +7,62 @@ on:
 
 jobs:
 
+  # ── ÉTAPE 3 : Déploiement TEST ──────────────
   deploy-test:
     runs-on: [self-hosted, runner-test]
     environment: staging
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
+      - uses: actions/checkout@v3
       - name: Copier APK vers TEST
         run: |
-          if [ -d "$GITHUB_WORKSPACE/releases" ]; then
-            chmod 755 /srv/test/releases
-            cp -r $GITHUB_WORKSPACE/releases/* /srv/test/releases/ 2>/dev/null || true
-          fi
-          echo "APK disponible sur http://192.168.137.68:8080/releases/"
+          chmod 755 /srv/test/releases
+          cp -r $GITHUB_WORKSPACE/releases/* /srv/test/releases/ 2>/dev/null || true
+          echo "APK visible sur http://192.168.137.68:8080/releases/"
 
-  validate:
+  # ── ÉTAPE 5 : Extraction archive ────────────
+  extract:
     needs: deploy-test
+    runs-on: [self-hosted, runner-test]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Créer archive du projet validé
+        run: |
+          VERSION=$(date +%Y%m%d-%H%M%S)
+          tar -czf /tmp/projet-v$VERSION.tar.gz \
+            --exclude='.git' \
+            -C $GITHUB_WORKSPACE .
+          echo "Archive créée : projet-v$VERSION.tar.gz"
+
+      - name: Publier archive sur GitHub
+        uses: actions/upload-artifact@v3
+        with:
+          name: projet-valide
+          path: /tmp/projet-v*.tar.gz
+          retention-days: 30
+
+  # ── ÉTAPE 6 : Approbation manuelle ──────────
+  validate:
+    needs: extract
     runs-on: [self-hosted, runner-test]
     environment:
       name: production-approval
     steps:
-      - run: echo "Validé - promotion vers Production"
+      - run: echo "Chef de projet a approuvé le déploiement"
 
+  # ── ÉTAPE 7 : Déploiement PROD ──────────────
   deploy-prod:
     needs: validate
     runs-on: [self-hosted, tolotra-VirtualBox]
     environment: production
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Copier APK vers PROD
+      - uses: actions/checkout@v3
+      - name: Déployer APK sur PROD
         run: |
-          if [ -d "$GITHUB_WORKSPACE/releases" ]; then
-            mkdir -p /srv/releases
-            cp -r $GITHUB_WORKSPACE/releases/* /srv/releases/ 2>/dev/null || true
-          fi
-          echo "APK disponible sur http://192.168.137.153/releases/"
+          mkdir -p /srv/releases
+          cp -r $GITHUB_WORKSPACE/releases/* /srv/releases/ 2>/dev/null || true
+          echo "APK visible sur http://192.168.137.153/releases/"
 
+  # ── ÉTAPE 8 : Nettoyage TEST ─────────────────
   cleanup-test:
     needs: deploy-prod
     runs-on: [self-hosted, runner-test]
@@ -54,4 +71,4 @@ jobs:
         run: |
           rm -rf /srv/test/releases/*
           chmod 000 /srv/test/releases 2>/dev/null || true
-          echo "APK retiré du TEST"
+          echo "APK retiré du TEST - disponible uniquement sur PROD"
