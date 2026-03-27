@@ -9,7 +9,7 @@ jobs:
 
   # ── ÉTAPE 3 : Déploiement TEST ──────────────
   deploy-test:
-    runs-on: [self-hosted, runner-test]
+    runs-on: self-hosted
     environment: staging
     steps:
       - uses: actions/checkout@v3
