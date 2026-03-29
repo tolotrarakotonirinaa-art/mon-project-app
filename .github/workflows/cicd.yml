@@ -7,68 +7,99 @@ on:
 
 jobs:
 
-  # ── ÉTAPE 3 : Déploiement TEST ──────────────
+  # ─────────────────────────────
+  # 1. DEPLOY TEST
+  # ─────────────────────────────
   deploy-test:
     runs-on: self-hosted
     environment: staging
-    steps:
-      - uses: actions/checkout@v3
-      - name: Copier APK vers TEST
-        run: |
-          chmod 755 /srv/test/releases
-          cp -r $GITHUB_WORKSPACE/releases/* /srv/test/releases/ 2>/dev/null || true
-          echo "APK visible sur http://192.168.137.68:8080/releases/"
 
-  # ── ÉTAPE 5 : Extraction archive ────────────
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Déployer sur TEST
+        run: |
+          echo "Déploiement sur serveur TEST"
+          mkdir -p /srv/test/releases
+          cp -r $GITHUB_WORKSPACE/releases/* /srv/test/releases/ 2>/dev/null || true
+          echo "APK disponible sur TEST : http://192.168.137.68:8080/releases/"
+
+  # ─────────────────────────────
+  # 2. EXTRACTION ARCHIVE
+  # ─────────────────────────────
   extract:
     needs: deploy-test
-    runs-on: [self-hosted, runner-test]
+    runs-on: self-hosted
+
     steps:
-      - uses: actions/checkout@v3
-      - name: Créer archive du projet validé
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Créer archive du projet
         run: |
           VERSION=$(date +%Y%m%d-%H%M%S)
-          tar -czf /tmp/projet-v$VERSION.tar.gz \
-            --exclude='.git' \
-            -C $GITHUB_WORKSPACE .
-          echo "Archive créée : projet-v$VERSION.tar.gz"
+          ARCHIVE_NAME="projet-$VERSION.tar.gz"
 
-      - name: Publier archive sur GitHub
+          tar -czf /tmp/$ARCHIVE_NAME \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            -C $GITHUB_WORKSPACE .
+
+          echo "Archive créée : $ARCHIVE_NAME"
+
+      - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
           name: projet-valide
-          path: /tmp/projet-v*.tar.gz
+          path: /tmp/*.tar.gz
           retention-days: 30
 
-  # ── ÉTAPE 6 : Approbation manuelle ──────────
+  # ─────────────────────────────
+  # 3. VALIDATION MANUELLE
+  # ─────────────────────────────
   validate:
     needs: extract
-    runs-on: [self-hosted, runner-test]
+    runs-on: self-hosted
     environment:
       name: production-approval
-    steps:
-      - run: echo "Chef de projet a approuvé le déploiement"
 
-  # ── ÉTAPE 7 : Déploiement PROD ──────────────
+    steps:
+      - name: Attente validation chef de projet
+        run: echo "En attente d'approbation pour production..."
+
+  # ─────────────────────────────
+  # 4. DEPLOY PROD
+  # ─────────────────────────────
   deploy-prod:
     needs: validate
-    runs-on: [self-hosted, tolotra-VirtualBox]
+    runs-on: self-hosted
     environment: production
+
     steps:
-      - uses: actions/checkout@v3
-      - name: Déployer APK sur PROD
+      - name: Download artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: projet-valide
+
+      - name: Déployer sur PROD
         run: |
+          echo "Déploiement sur serveur PROD"
           mkdir -p /srv/releases
           cp -r $GITHUB_WORKSPACE/releases/* /srv/releases/ 2>/dev/null || true
-          echo "APK visible sur http://192.168.137.153/releases/"
+          echo "APK disponible sur PROD : http://192.168.137.153/releases/"
 
-  # ── ÉTAPE 8 : Nettoyage TEST ─────────────────
+  # ─────────────────────────────
+  # 5. CLEANUP TEST
+  # ─────────────────────────────
   cleanup-test:
     needs: deploy-prod
-    runs-on: [self-hosted, runner-test]
+    runs-on: self-hosted
+
     steps:
-      - name: Supprimer APK du TEST
+      - name: Nettoyage TEST
         run: |
+          echo "Suppression des fichiers sur TEST"
           rm -rf /srv/test/releases/*
-          chmod 000 /srv/test/releases 2>/dev/null || true
-          echo "APK retiré du TEST - disponible uniquement sur PROD"
+          chmod 755 /srv/test/releases 2>/dev/null || true
+          echo "TEST nettoyé - APK disponible uniquement sur PROD"
