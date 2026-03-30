@@ -7,99 +7,86 @@ on:
 
 jobs:
 
-  # ─────────────────────────────
-  # 1. DEPLOY TEST
-  # ─────────────────────────────
+  # ── TEST ──
   deploy-test:
-    runs-on: self-hosted
+    runs-on: [self-hosted, runner-test]
     environment: staging
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Déployer sur TEST
         run: |
-          echo "Déploiement sur serveur TEST"
           mkdir -p /srv/test/releases
+          chmod 755 /srv/test/releases
           cp -r $GITHUB_WORKSPACE/releases/* /srv/test/releases/ 2>/dev/null || true
-          echo "APK disponible sur TEST : http://192.168.137.68:8080/releases/"
+          echo "Application disponible sur http://192.168.137.68:8080/releases/"
 
-  # ─────────────────────────────
-  # 2. EXTRACTION ARCHIVE
-  # ─────────────────────────────
-  extract:
+  # ── VALIDATION AGENT ──
+  validation-agent:
     needs: deploy-test
-    runs-on: self-hosted
-
+    runs-on: [self-hosted, runner-test]
+    environment:
+      name: agent-approval
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - run: echo "Agent a validé l'application sur TEST"
 
-      - name: Créer archive du projet
+  # ── EXTRACTION ──
+  extract:
+    needs: validation-agent
+    runs-on: [self-hosted, runner-test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Créer archive
         run: |
           VERSION=$(date +%Y%m%d-%H%M%S)
-          ARCHIVE_NAME="projet-$VERSION.tar.gz"
-
-          tar -czf /tmp/$ARCHIVE_NAME \
+          tar -czf /tmp/projet-v$VERSION.tar.gz \
             --exclude='.git' \
-            --exclude='node_modules' \
             -C $GITHUB_WORKSPACE .
 
-          echo "Archive créée : $ARCHIVE_NAME"
-
-      - name: Upload artifact
+      - name: Publier archive
         uses: actions/upload-artifact@v4
         with:
           name: projet-valide
-          path: /tmp/*.tar.gz
+          path: /tmp/projet-v*.tar.gz
           retention-days: 30
 
-  # ─────────────────────────────
-  # 3. VALIDATION MANUELLE
-  # ─────────────────────────────
-  validate:
+  # ── CLEAN TEST ──
+  cleanup-test:
     needs: extract
-    runs-on: self-hosted
+    runs-on: [self-hosted, runner-test]
+    steps:
+      - name: Retirer APK du TEST
+        run: |
+          rm -rf /srv/test/releases/*
+          chmod 000 /srv/test/releases 2>/dev/null || true
+          echo "APK retiré du TEST"
+
+  # ── VALIDATION CHEF ──
+  validation-chef:
+    needs: cleanup-test
+    runs-on: [self-hosted, runner-test]
     environment:
       name: production-approval
-
     steps:
-      - name: Attente validation chef de projet
-        run: echo "En attente d'approbation pour production..."
+      - run: echo "Chef de projet a approuvé le déploiement en PROD"
 
-  # ─────────────────────────────
-  # 4. DEPLOY PROD
-  # ─────────────────────────────
+  # ── DEPLOY PROD ──
   deploy-prod:
-    needs: validate
-    runs-on: self-hosted
+    needs: validation-chef
+    runs-on: [self-hosted, tolotra-VirtualBox]
     environment: production
-
     steps:
-      - name: Download artifact
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: projet-valide
 
       - name: Déployer sur PROD
         run: |
-          echo "Déploiement sur serveur PROD"
           mkdir -p /srv/releases
-          cp -r $GITHUB_WORKSPACE/releases/* /srv/releases/ 2>/dev/null || true
-          echo "APK disponible sur PROD : http://192.168.137.153/releases/"
+          chmod 755 /srv/releases
 
-  # ─────────────────────────────
-  # 5. CLEANUP TEST
-  # ─────────────────────────────
-  cleanup-test:
-    needs: deploy-prod
-    runs-on: self-hosted
+          # Extraction archive
+          tar -xzf projet-valide/*.tar.gz -C /srv/releases 2>/dev/null || true
 
-    steps:
-      - name: Nettoyage TEST
-        run: |
-          echo "Suppression des fichiers sur TEST"
-          rm -rf /srv/test/releases/*
-          chmod 755 /srv/test/releases 2>/dev/null || true
-          echo "TEST nettoyé - APK disponible uniquement sur PROD"
+          echo "Application accessible sur http://192.168.137.153/releases/"
