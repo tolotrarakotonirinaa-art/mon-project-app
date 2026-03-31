@@ -8,11 +8,11 @@ on:
 jobs:
 
   deploy-test:
-    runs-on: self-hosted
+   runs-on: self-hosted
     environment: staging
     steps:
       - uses: actions/checkout@v4
-      - name: Déployer sur TEST
+      - name: Deployer sur TEST
         run: |
           chmod 755 /srv/test/releases
           cp -r $GITHUB_WORKSPACE/releases/* /srv/test/releases/ 2>/dev/null || true
@@ -24,20 +24,18 @@ jobs:
     environment:
       name: agent-approval
     steps:
-      - run: echo "Agent a validé"
+      - run: echo "Agent a valide"
 
   extract:
     needs: validation-agent
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
-      - name: Créer archive locale
+      - name: Creer archive locale
         run: |
           VERSION=$(date +%Y%m%d-%H%M%S)
           mkdir -p /srv/test/archives
-          tar -czf /srv/test/archives/projet-v$VERSION.tar.gz \
-            --exclude='.git' \
-            -C $GITHUB_WORKSPACE .
+          tar -czf /srv/test/archives/projet-v$VERSION.tar.gz --exclude='.git' -C $GITHUB_WORKSPACE .
           ls -lh /srv/test/archives/
 
   cleanup-test:
@@ -48,23 +46,23 @@ jobs:
         run: |
           rm -rf /srv/test/releases/*
           chmod 000 /srv/test/releases 2>/dev/null || true
-          echo "APK retiré du TEST"
+          echo "APK retire du TEST"
 
   validation-chef:
     needs: cleanup-test
-   runs-on: self-hosted
+    runs-on: self-hosted
     environment:
       name: production-approval
     steps:
-      - run: echo "Chef de projet a approuvé"
+      - run: echo "Chef de projet a approuve"
 
   deploy-prod:
     needs: validation-chef
-   runs-on: self-hosted
+    runs-on: self-hosted
     environment: production
     steps:
       - uses: actions/checkout@v4
-      - name: Déployer sur PROD
+      - name: Deployer sur PROD
         run: |
           mkdir -p /srv/releases
           cp -r $GITHUB_WORKSPACE/releases/* /srv/releases/ 2>/dev/null || true
