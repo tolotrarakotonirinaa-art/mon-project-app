@@ -9,7 +9,7 @@ jobs:
 
   # ───────── TEST ─────────
   deploy-test:
-    runs-on: [self-hosted, runner-test]
+    runs-on: self-hosted
     environment: staging
     steps:
       - uses: actions/checkout@v4
@@ -24,7 +24,7 @@ jobs:
   # ───────── VALIDATION AGENT ─────────
   validation-agent:
     needs: deploy-test
-    runs-on: [self-hosted, runner-test]
+    runs-on: self-hosted
     environment:
       name: agent-approval
     steps:
@@ -33,7 +33,7 @@ jobs:
   # ───────── EXTRACTION ─────────
   extract:
     needs: validation-agent
-    runs-on: [self-hosted, runner-test]
+   runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
 
@@ -50,7 +50,7 @@ jobs:
   # ───────── CLEAN TEST ─────────
   cleanup-test:
     needs: extract
-    runs-on: [self-hosted, runner-test]
+    runs-on: self-hosted
     steps:
       - name: Nettoyer TEST
         run: |
@@ -61,7 +61,7 @@ jobs:
   # ───────── VALIDATION CHEF ─────────
   validation-chef:
     needs: cleanup-test
-    runs-on: [self-hosted, runner-test]
+    runs-on: self-hosted
     environment:
       name: production-approval
     steps:
@@ -70,7 +70,7 @@ jobs:
   # ───────── DEPLOY PROD ─────────
   deploy-prod:
     needs: validation-chef
-    runs-on: [self-hosted, runner-prod]
+   runs-on: self-hosted
     environment: production
     steps:
       - uses: actions/checkout@v4
