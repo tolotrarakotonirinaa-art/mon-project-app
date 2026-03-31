@@ -62,10 +62,6 @@ jobs:
     steps:
       - name: Deployer application sur PROD
         run: |
-          cd /srv/prod/app
-          git fetch --all
-          git checkout main
-          git merge origin/staging
           mkdir -p /srv/prod/html
           cp -r /srv/prod/app/frontend/* /srv/prod/html/ 2>/dev/null || true
           docker restart prod-nginx
