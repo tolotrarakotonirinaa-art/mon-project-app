@@ -7,65 +7,77 @@ on:
 
 jobs:
 
+  # ───────── TEST ─────────
   deploy-test:
     runs-on: [self-hosted, runner-test]
     environment: staging
     steps:
       - uses: actions/checkout@v4
+
       - name: Deployer sur TEST
         run: |
           mkdir -p /srv/test/releases
           chmod 755 /srv/test/releases
           cp -r $GITHUB_WORKSPACE/releases/* /srv/test/releases/ 2>/dev/null || true
-          echo "Application disponible sur http://192.168.137.68:8080"
+          echo "TEST OK: http://192.168.137.68:8080/releases/"
 
+  # ───────── VALIDATION AGENT ─────────
   validation-agent:
     needs: deploy-test
     runs-on: [self-hosted, runner-test]
     environment:
       name: agent-approval
     steps:
-      - run: echo "Agent a valide"
+      - run: echo "Agent a validé l'application"
 
+  # ───────── EXTRACTION ─────────
   extract:
     needs: validation-agent
     runs-on: [self-hosted, runner-test]
     steps:
       - uses: actions/checkout@v4
+
       - name: Creer archive locale
         run: |
           VERSION=$(date +%Y%m%d-%H%M%S)
           mkdir -p /srv/test/archives
-          tar -czf /srv/test/archives/projet-v$VERSION.tar.gz --exclude='.git' -C $GITHUB_WORKSPACE .
+          tar -czf /srv/test/archives/projet-v$VERSION.tar.gz \
+            --exclude='.git' \
+            -C $GITHUB_WORKSPACE .
+          echo "Archive créée:"
           ls -lh /srv/test/archives/
 
+  # ───────── CLEAN TEST ─────────
   cleanup-test:
     needs: extract
     runs-on: [self-hosted, runner-test]
     steps:
-      - name: Retirer APK du TEST
+      - name: Nettoyer TEST
         run: |
           rm -rf /srv/test/releases/*
           chmod 755 /srv/test/releases
-          echo "APK retire du TEST"
+          echo "TEST nettoyé"
 
+  # ───────── VALIDATION CHEF ─────────
   validation-chef:
     needs: cleanup-test
     runs-on: [self-hosted, runner-test]
     environment:
       name: production-approval
     steps:
-      - run: echo "Chef de projet a approuve"
+      - run: echo "Chef de projet a approuvé"
 
+  # ───────── DEPLOY PROD ─────────
   deploy-prod:
     needs: validation-chef
-    runs-on: [self-hosted, runner-prod]   # ✅ CORRIGÉ ICI
+    runs-on: [self-hosted, runner-prod]
     environment: production
     steps:
       - uses: actions/checkout@v4
+
       - name: Deployer sur PROD
         run: |
           mkdir -p /srv/releases
           chmod 755 /srv/releases
           cp -r $GITHUB_WORKSPACE/releases/* /srv/releases/ 2>/dev/null || true
-          echo "Application accessible sur http://192.168.137.153"
+          echo "PROD OK: http://192.168.137.153/releases/"
