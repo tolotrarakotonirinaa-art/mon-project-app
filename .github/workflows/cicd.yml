@@ -11,12 +11,15 @@ jobs:
     runs-on: self-hosted
     environment: staging
     steps:
-      - uses: actions/checkout@v4
       - name: Deployer sur TEST
         run: |
           mkdir -p /srv/test/releases
           chmod 755 /srv/test/releases
-          cp -r $GITHUB_WORKSPACE/releases/* /srv/test/releases/ 2>/dev/null || true
+          cd /srv/test/app
+          git fetch --all
+          git checkout staging
+          git pull origin staging
+          cp -r /srv/test/app/releases/* /srv/test/releases/ 2>/dev/null || true
           echo "Deploye sur TEST"
 
   validation-agent:
@@ -25,17 +28,17 @@ jobs:
     environment:
       name: agent-approval
     steps:
-      - run: echo "Agent a valide"
+      - name: Validation agent
+        run: echo "Agent a valide"
 
   extract:
     needs: validation-agent
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v4
       - name: Creer archive
         run: |
           mkdir -p /srv/test/archives
-          tar -czf /srv/test/archives/projet.tar.gz --exclude='.git' -C $GITHUB_WORKSPACE .
+          tar -czf /srv/test/archives/projet.tar.gz --exclude='.git' -C /srv/test/app .
           ls -lh /srv/test/archives/
 
   cleanup-test:
@@ -54,17 +57,20 @@ jobs:
     environment:
       name: production-approval
     steps:
-      - run: echo "Chef a approuve"
+      - name: Validation chef
+        run: echo "Chef a approuve"
 
   deploy-prod:
     needs: validation-chef
     runs-on: self-hosted
-    environment: production
     steps:
-      - uses: actions/checkout@v4
       - name: Deployer sur PROD
         run: |
           mkdir -p /srv/releases
           chmod 755 /srv/releases
-          cp -r $GITHUB_WORKSPACE/releases/* /srv/releases/ 2>/dev/null || true
+          cd /srv/prod/app
+          git fetch --all
+          git checkout main
+          git merge origin/staging
+          cp -r /srv/prod/app/releases/* /srv/releases/ 2>/dev/null || true
           echo "Deploye sur PROD"
