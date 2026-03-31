@@ -60,9 +60,13 @@ jobs:
     needs: validation-chef
     runs-on: [self-hosted, prod-server]
     steps:
-      - name: Deployer sur PROD
+      - name: Deployer application sur PROD
         run: |
-          mkdir -p /srv/releases
-          chmod 755 /srv/releases
-          cp -r /srv/prod/app/releases/* /srv/releases/ 2>/dev/null || true
-          echo "Deploye sur PROD"
+          cd /srv/prod/app
+          git fetch --all
+          git checkout main
+          git merge origin/staging
+          mkdir -p /srv/prod/html
+          cp -r /srv/prod/app/frontend/* /srv/prod/html/ 2>/dev/null || true
+          docker restart prod-nginx
+          echo "Application visible sur http://192.168.137.153"
