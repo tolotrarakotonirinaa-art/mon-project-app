@@ -8,7 +8,7 @@ on:
 jobs:
 
   deploy-test:
-    runs-on: [self-hosted, runner-test]
+    runs-on: self-hosted
     environment: staging
     steps:
       - uses: actions/checkout@v4
@@ -20,7 +20,7 @@ jobs:
 
   validation-agent:
     needs: deploy-test
-    runs-on: [self-hosted, runner-test]
+    runs-on: self-hosted
     environment:
       name: agent-approval
     steps:
@@ -28,7 +28,7 @@ jobs:
 
   extract:
     needs: validation-agent
-    runs-on: [self-hosted, runner-test]
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
       - name: Créer archive locale
@@ -42,7 +42,7 @@ jobs:
 
   cleanup-test:
     needs: extract
-    runs-on: [self-hosted, runner-test]
+    runs-on: self-hosted
     steps:
       - name: Retirer APK du TEST
         run: |
@@ -52,7 +52,7 @@ jobs:
 
   validation-chef:
     needs: cleanup-test
-    runs-on: [self-hosted, runner-test]
+   runs-on: self-hosted
     environment:
       name: production-approval
     steps:
@@ -60,7 +60,7 @@ jobs:
 
   deploy-prod:
     needs: validation-chef
-    runs-on: [self-hosted, tolotra-VirtualBox]
+   runs-on: self-hosted
     environment: production
     steps:
       - uses: actions/checkout@v4
