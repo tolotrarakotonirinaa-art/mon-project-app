@@ -1,4 +1,13 @@
-deploy-test:
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - staging
+
+jobs:
+
+  deploy-test:
     runs-on: [self-hosted, test-server]
     environment: staging
     steps:
@@ -8,6 +17,44 @@ deploy-test:
           docker compose down
           docker compose up -d --build
           echo "Application visible sur http://192.168.137.68:8080"
+
+  validation-agent:
+    needs: deploy-test
+    runs-on: [self-hosted, test-server]
+    environment:
+      name: agent-approval
+    steps:
+      - name: Validation agent
+        run: echo "Agent a valide"
+
+  extract:
+    needs: validation-agent
+    runs-on: [self-hosted, test-server]
+    steps:
+      - name: Creer archive
+        run: |
+          mkdir -p /srv/test/archives
+          tar -czf /srv/test/archives/projet.tar.gz --exclude='.git' -C /srv/test/app .
+          ls -lh /srv/test/archives/
+
+  cleanup-test:
+    needs: extract
+    runs-on: [self-hosted, test-server]
+    steps:
+      - name: Retirer APK du TEST
+        run: |
+          rm -rf /srv/test/releases/*
+          chmod 755 /srv/test/releases
+          echo "APK retire du TEST"
+
+  validation-chef:
+    needs: cleanup-test
+    runs-on: [self-hosted, test-server]
+    environment:
+      name: production-approval
+    steps:
+      - name: Validation chef
+        run: echo "Chef a approuve"
 
   deploy-prod:
     needs: validation-chef
