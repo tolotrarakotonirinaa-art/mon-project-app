@@ -1,68 +1,21 @@
-name: CI/CD Pipeline
-
-on:
-  push:
-    branches:
-      - staging
-
-jobs:
-
-  deploy-test:
+deploy-test:
     runs-on: [self-hosted, test-server]
     environment: staging
     steps:
       - name: Deployer sur TEST
         run: |
-          mkdir -p /srv/test/releases
-          chmod 755 /srv/test/releases
-          cp -r /srv/test/app/releases/* /srv/test/releases/ 2>/dev/null || true
-          echo "Deploye sur TEST"
-
-  validation-agent:
-    needs: deploy-test
-    runs-on: [self-hosted, test-server]
-    environment:
-      name: agent-approval
-    steps:
-      - name: Validation agent
-        run: echo "Agent a valide"
-
-  extract:
-    needs: validation-agent
-    runs-on: [self-hosted, test-server]
-    steps:
-      - name: Creer archive
-        run: |
-          mkdir -p /srv/test/archives
-          tar -czf /srv/test/archives/projet.tar.gz --exclude='.git' -C /srv/test/app .
-          ls -lh /srv/test/archives/
-
-  cleanup-test:
-    needs: extract
-    runs-on: [self-hosted, test-server]
-    steps:
-      - name: Retirer APK du TEST
-        run: |
-          rm -rf /srv/test/releases/*
-          chmod 755 /srv/test/releases
-          echo "APK retire du TEST"
-
-  validation-chef:
-    needs: cleanup-test
-    runs-on: [self-hosted, test-server]
-    environment:
-      name: production-approval
-    steps:
-      - name: Validation chef
-        run: echo "Chef a approuve"
+          cd /srv/test
+          docker compose down
+          docker compose up -d --build
+          echo "Application visible sur http://192.168.137.68:8080"
 
   deploy-prod:
     needs: validation-chef
     runs-on: [self-hosted, prod-server]
     steps:
-      - name: Deployer application sur PROD
+      - name: Deployer sur PROD
         run: |
-          mkdir -p /srv/prod/html
-          cp -r /srv/prod/app/frontend/* /srv/prod/html/ 2>/dev/null || true
-          docker restart prod-nginx
+          cd /srv/prod
+          docker compose -f docker-compose.prod.yml down
+          docker compose -f docker-compose.prod.yml up -d --build
           echo "Application visible sur http://192.168.137.153"
