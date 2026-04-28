@@ -8,7 +8,7 @@ on:
 jobs:
 
   deploy-test:
-    runs-on: [self-hosted, tolotra-runner]
+    runs-on: [self-hosted, test-server]
     environment: staging
     steps:
       - name: Deployer sur TEST
@@ -19,7 +19,7 @@ jobs:
 
   validation-agent:
     needs: deploy-test
-    runs-on: [self-hosted, tolotra-runner]
+    runs-on: [self-hosted, test-server]
     environment:
       name: agent-approval
     steps:
@@ -28,7 +28,7 @@ jobs:
 
   extract:
     needs: validation-agent
-    runs-on: [self-hosted, tolotra-runner]
+    runs-on: [self-hosted, test-server]
     steps:
       - name: Creer archive avy amin'ny TEST
         run: |
@@ -52,7 +52,7 @@ jobs:
 
   cleanup-test:
     needs: extract
-    runs-on: [self-hosted, tolotra-runner]
+    runs-on: [self-hosted, test-server]
     steps:
       - name: Retirer APK du TEST
         run: |
@@ -62,7 +62,7 @@ jobs:
 
   validation-chef:
     needs: cleanup-test
-    runs-on: [self-hosted, tolotra-runner]
+    runs-on: [self-hosted, test-server]
     environment:
       name: production-approval
     steps:
