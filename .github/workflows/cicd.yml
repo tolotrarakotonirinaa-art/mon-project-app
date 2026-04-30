@@ -11,6 +11,9 @@ jobs:
     runs-on: [self-hosted, test-server]
     environment: staging
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Deployer sur TEST
         run: |
           cd /srv/test
@@ -24,6 +27,8 @@ jobs:
           chmod 755 /srv/test/releases
           VERSION=$(date +%Y%m%d-%H%M%S)
           COMMIT=${GITHUB_SHA::7}
+          echo "Jerena releases folder:"
+          ls -lh $GITHUB_WORKSPACE/releases/
           if ls $GITHUB_WORKSPACE/releases/*.apk 2>/dev/null; then
             for apk in $GITHUB_WORKSPACE/releases/*.apk; do
               if [ -f "$apk" ]; then
@@ -36,7 +41,6 @@ jobs:
             echo "Tsy misy APK vaovao ao amin ny releases/"
           fi
           ls -lh /srv/test/releases/
-          echo "APK visible sur http://localhost:8080/releases/"
 
   validation-agent:
     needs: deploy-test
