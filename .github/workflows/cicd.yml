@@ -19,6 +19,25 @@ jobs:
           docker ps
           echo "Application visible sur http://localhost:8080"
 
+      - name: Copier APK misy version automatique
+        run: |
+          chmod 755 /srv/test/releases
+          VERSION=$(date +%Y%m%d-%H%M%S)
+          COMMIT=${GITHUB_SHA::7}
+          if ls $GITHUB_WORKSPACE/releases/*.apk 2>/dev/null; then
+            for apk in $GITHUB_WORKSPACE/releases/*.apk; do
+              if [ -f "$apk" ]; then
+                BASENAME=$(basename "$apk" .apk)
+                cp "$apk" "/srv/test/releases/${BASENAME}-${VERSION}-${COMMIT}.apk"
+                echo "APK copie: ${BASENAME}-${VERSION}-${COMMIT}.apk"
+              fi
+            done
+          else
+            echo "Tsy misy APK vaovao ao amin ny releases/"
+          fi
+          ls -lh /srv/test/releases/
+          echo "APK visible sur http://localhost:8080/releases/"
+
   validation-agent:
     needs: deploy-test
     runs-on: [self-hosted, test-server]
@@ -87,3 +106,16 @@ jobs:
           sleep 10
           docker ps
           echo "PROD deploye sur http://localhost:80"
+
+      - name: Copier APK any PROD releases
+        run: |
+          mkdir -p /srv/releases
+          chmod 755 /srv/releases
+          if ls /srv/test/archives/*.apk 2>/dev/null; then
+            cp /srv/test/archives/*.apk /srv/releases/
+            echo "APK copie any PROD"
+          else
+            echo "Tsy misy APK ao amin ny archives"
+          fi
+          ls -lh /srv/releases/
+          echo "APK visible sur http://localhost:80/releases/"
