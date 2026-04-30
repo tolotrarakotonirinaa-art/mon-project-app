@@ -45,10 +45,21 @@ jobs:
       name: agent-approval
     steps:
       - name: Validation agent
-        run: echo "Agent a valide"
+        run: |
+          echo "APK visible sur http://localhost:8080/releases/"
+          ls -lh /srv/test/releases/
+
+  validation-chef:
+    needs: validation-agent
+    runs-on: [self-hosted, test-server]
+    environment:
+      name: production-approval
+    steps:
+      - name: Validation chef
+        run: echo "Chef a approuve"
 
   extract:
-    needs: validation-agent
+    needs: validation-chef
     runs-on: [self-hosted, test-server]
     steps:
       - name: Creer archive avy amin ny TEST
@@ -66,27 +77,8 @@ jobs:
           ls -lh /srv/test/archives/projet.tar.gz
           echo "Archive vita"
 
-  cleanup-test:
-    needs: extract
-    runs-on: [self-hosted, test-server]
-    steps:
-      - name: Retirer APK du TEST
-        run: |
-          rm -rf /srv/test/releases/*
-          chmod 755 /srv/test/releases
-          echo "APK retire du TEST"
-
-  validation-chef:
-    needs: cleanup-test
-    runs-on: [self-hosted, test-server]
-    environment:
-      name: production-approval
-    steps:
-      - name: Validation chef
-        run: echo "Chef a approuve"
-
   deploy-prod:
-    needs: validation-chef
+    needs: extract
     runs-on: [self-hosted, prod-runner]
     steps:
       - name: Deploy any PROD
@@ -96,10 +88,6 @@ jobs:
           mkdir -p /srv/prod/app/frontend
           mkdir -p /srv/prod/app/backend
           tar -xzf /srv/test/archives/projet.tar.gz -C /srv/prod/app/
-          echo "Verification frontend"
-          ls /srv/prod/app/frontend/
-          echo "Verification backend"
-          ls /srv/prod/app/backend/
           cd /srv/prod
           docker compose -f docker-compose.prod.yml down --remove-orphans
           docker compose -f docker-compose.prod.yml up -d --build
@@ -107,15 +95,12 @@ jobs:
           docker ps
           echo "PROD deploye sur http://localhost:80"
 
-      - name: Copier APK any PROD releases
+  cleanup-test:
+    needs: deploy-prod
+    runs-on: [self-hosted, test-server]
+    steps:
+      - name: Retirer APK du TEST
         run: |
-          mkdir -p /srv/releases
-          chmod 755 /srv/releases
-          if ls /srv/test/archives/*.apk 2>/dev/null; then
-            cp /srv/test/archives/*.apk /srv/releases/
-            echo "APK copie any PROD"
-          else
-            echo "Tsy misy APK ao amin ny archives"
-          fi
-          ls -lh /srv/releases/
-          echo "APK visible sur http://localhost:80/releases/"
+          rm -rf /srv/test/releases/*
+          chmod 755 /srv/test/releases
+          echo "APK retire du TEST - disponible uniquement sur PROD"
