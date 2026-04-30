@@ -15,6 +15,8 @@ jobs:
         run: |
           cd /srv/test
           docker compose up -d
+          sleep 5
+          docker ps
           echo "Application visible sur http://localhost:8080"
 
   validation-agent:
@@ -30,25 +32,20 @@ jobs:
     needs: validation-agent
     runs-on: [self-hosted, test-server]
     steps:
-      - name: Creer archive avy amin'ny TEST
+      - name: Creer archive avy amin ny TEST
         run: |
           mkdir -p /srv/test/archives
+          rm -f /srv/test/archives/projet.tar.gz
           tar -czf /srv/test/archives/projet.tar.gz \
             --exclude='.git' \
             --exclude='node_modules' \
             --exclude='vendor' \
             --exclude='storage/logs' \
+            --exclude='storage/framework/cache' \
             -C /srv/test/app \
             frontend backend
-          ls -lh /srv/test/archives/
+          ls -lh /srv/test/archives/projet.tar.gz
           echo "Archive vita"
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: projet-valide
-          path: /srv/test/archives/projet.tar.gz
-          retention-days: 7
 
   cleanup-test:
     needs: extract
@@ -73,18 +70,20 @@ jobs:
     needs: validation-chef
     runs-on: [self-hosted, prod-runner]
     steps:
-      - name: Mandray archive
-        uses: actions/download-artifact@v4
-        with:
-          name: projet-valide
-          path: /tmp/
-
       - name: Deploy any PROD
         run: |
+          echo "Reception archive avy amin ny TEST"
+          ls -lh /srv/test/archives/projet.tar.gz
           mkdir -p /srv/prod/app/frontend
           mkdir -p /srv/prod/app/backend
-          tar -xzf /tmp/projet.tar.gz -C /srv/prod/app/
+          tar -xzf /srv/test/archives/projet.tar.gz -C /srv/prod/app/
+          echo "Verification frontend"
+          ls /srv/prod/app/frontend/
+          echo "Verification backend"
+          ls /srv/prod/app/backend/
           cd /srv/prod
           docker compose -f docker-compose.prod.yml down --remove-orphans
           docker compose -f docker-compose.prod.yml up -d --build
+          sleep 10
+          docker ps
           echo "PROD deploye sur http://localhost:80"
