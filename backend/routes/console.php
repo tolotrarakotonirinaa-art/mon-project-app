@@ -1,7 +1,7 @@
 <?php
-
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
 use App\Services\MockDataStore;
 
 Artisan::command('inspire', function () {
@@ -22,3 +22,6 @@ Artisan::command('mock:show {collection?}', function (string $collection = 'user
         array_map(fn($i) => array_values($i), array_slice($data, 0, 5))
     );
 })->purpose('Afficher les données mock d\'une collection');
+
+// ← VAOVAO: Schedule — mise à jour statuts tâches chaque jour à minuit
+Schedule::command('tasks:update-statuses')->daily();

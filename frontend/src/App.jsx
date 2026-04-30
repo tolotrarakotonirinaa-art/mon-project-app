@@ -15,6 +15,9 @@ import Projects  from './pages/Projects.jsx'
 import Tasks     from './pages/Tasks.jsx'
 import Pipeline  from './pages/Pipeline.jsx'
 
+// ── Page Admin ────────────────────────────────────────────
+import AdminValidation from './pages/admin/AdminValidation.jsx'
+
 // ── Autres pages ──────────────────────────────────────────
 import {
   Repositories,
@@ -29,6 +32,14 @@ import {
   LogoutPage,
 } from './pages/OtherPages.jsx'
 
+// ── Guard Admin ───────────────────────────────────────────
+function AdminRoute({children}){
+  const {user} = useAuth()
+  if(!user) return <Navigate to="/login" replace/>
+  if(user.role !== 'admin') return <Navigate to="/dashboard" replace/>
+  return children
+}
+
 // ── Routes avec protection ────────────────────────────────
 function AppRoutes(){
   const {loading} = useAuth()
@@ -41,7 +52,7 @@ function AppRoutes(){
         <Route path="/register" element={<Register/>}/>
       </Route>
 
-      {/* Routes protégées */}
+      {/* Routes protegees */}
       <Route element={<AppLayout/>}>
         <Route path="/dashboard"     element={<Dashboard/>}/>
         <Route path="/projects"      element={<Projects/>}/>
@@ -57,6 +68,13 @@ function AppRoutes(){
         <Route path="/settings"      element={<SettingsPage/>}/>
         <Route path="/help"          element={<HelpPage/>}/>
         <Route path="/logout"        element={<LogoutPage/>}/>
+
+        {/* Route Admin uniquement */}
+        <Route path="/admin/validation" element={
+          <AdminRoute>
+            <AdminValidation/>
+          </AdminRoute>
+        }/>
       </Route>
 
       {/* Redirections */}

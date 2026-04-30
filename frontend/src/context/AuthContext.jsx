@@ -7,26 +7,22 @@ const Ctx = createContext(null)
 export function AuthProvider({children}){
   const [user,    setUser]    = useState(null)
   const [loading, setLoad]    = useState(true)
-  // État serveur exposé aux pages
   const [backendOk,  setBackendOk]  = useState(false)
   const [backendMsg, setBackendMsg] = useState('')
 
   useEffect(()=>{
     const init = async () => {
-      // 1. Vérifier si le backend est accessible
       const online = await checkServer()
       setBackendOk(online)
       setBackendMsg(serverStatus.message)
 
       if(!online){
-        // Backend absent → on ne connecte pas l'utilisateur
         localStorage.removeItem('dv4_token')
         localStorage.removeItem('dv4_current')
         setLoad(false)
         return
       }
 
-      // 2. Backend OK → vérifier le token existant
       const token = localStorage.getItem('dv4_token')
       if(!token){ setLoad(false); return }
 
@@ -43,8 +39,7 @@ export function AuthProvider({children}){
     init()
   },[])
 
-  const login = async(email, password, role) => {
-    // Vérifier le backend avant tout
+  const login = async(email, password) => {
     const online = await checkServer()
     setBackendOk(online)
     setBackendMsg(serverStatus.message)
@@ -52,14 +47,21 @@ export function AuthProvider({children}){
     if(!online){
       return {
         ok: false,
-        error: '❌ Impossible de contacter le serveur Laravel.\n\nLancez le backend avec :\nphp artisan serve\n\nPuis réessayez.',
+        error: 'Impossible de contacter le serveur Laravel. Lancez le backend avec : php artisan serve',
         offline: true,
       }
     }
 
-    const res = await api.login(email, password, role)
+    const res = await api.login(email, password)
 
     if(!res?.success){
+      if(res?.status === 403 || res?.message?.toLowerCase().includes('attente')){
+        return {
+          ok: false,
+          pending: true,
+          error: res?.message || "Votre compte est en attente de validation par l'administrateur.",
+        }
+      }
       return { ok:false, error: res?.message || 'Email ou mot de passe incorrect' }
     }
 
@@ -71,7 +73,6 @@ export function AuthProvider({children}){
   }
 
   const register = async(data) => {
-    // Vérifier le backend avant tout
     const online = await checkServer()
     setBackendOk(online)
     setBackendMsg(serverStatus.message)
@@ -79,21 +80,24 @@ export function AuthProvider({children}){
     if(!online){
       return {
         ok: false,
-        error: '❌ Impossible de contacter le serveur Laravel.\n\nLancez le backend avec :\nphp artisan serve\n\nPuis réessayez.',
         offline: true,
+        error: 'Impossible de contacter le serveur Laravel. Lancez le backend avec : php artisan serve',
       }
     }
 
-    const res = await api.register(data.name, data.email, data.password, data.role)
+    try {
+      const res = await api.register(data.name, data.email, data.password, data.role)
 
-    if(!res?.success){
-      return { ok:false, error: res?.message || "Erreur lors de l'inscription" }
+      if(!res?.success){
+        return { ok:false, error: res?.message || "Erreur lors de l'inscription" }
+      }
+
+      // tsy mametraka token — miandry validation admin
+      return { ok:true }
+
+    } catch(e) {
+      return { ok:false, error: "Erreur reseau. Verifiez que le backend est lance." }
     }
-
-    localStorage.setItem('dv4_token',   res.data.token)
-    localStorage.setItem('dv4_current', JSON.stringify(res.data.user))
-    setUser(res.data.user)
-    return { ok:true }
   }
 
   const logout = async() => {

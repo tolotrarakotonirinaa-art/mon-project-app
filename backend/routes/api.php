@@ -13,23 +13,11 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\StatisticsController;
 use App\Http\Controllers\DashboardController;
 
-/*
-|--------------------------------------------------------------------------
-| DevEnviron 4D — API Routes
-|--------------------------------------------------------------------------
-| Toutes les routes sont préfixées par /api (configuré dans bootstrap/app.php)
-|
-| Phase 1 : Données mockées (MockDataStore)
-| Phase 2 : PostgreSQL (même routes, mêmes controllers)
-|--------------------------------------------------------------------------
-*/
-
-// ── Health check ─────────────────────────────────────────
+// ── Health check ──────────────────────────────────────────
 Route::get('/health', fn() => response()->json([
     'status'  => 'ok',
     'app'     => 'DevEnviron 4D API',
     'version' => '1.0.0',
-    'phase'   => 'Phase 1 — Mock Data',
     'time'    => now()->toISOString(),
 ]));
 
@@ -44,10 +32,15 @@ Route::middleware('jwt.auth')->group(function () {
 
     // Auth
     Route::prefix('auth')->group(function () {
-        Route::get('/me',           [AuthController::class, 'me']);
-        Route::post('/logout',      [AuthController::class, 'logout']);
-        Route::put('/password',     [AuthController::class, 'changePassword']);
-        Route::put('/profile',      [AuthController::class, 'updateProfile']);
+        Route::get('/me',               [AuthController::class, 'me']);
+        Route::post('/logout',          [AuthController::class, 'logout']);
+        Route::put('/password',         [AuthController::class, 'changePassword']);
+        Route::put('/profile',          [AuthController::class, 'updateProfile']);
+
+        // ← VAOVAO: Admin validation routes
+        Route::get('/pending-users',            [AuthController::class, 'pendingUsers']);
+        Route::patch('/validate-user/{id}',     [AuthController::class, 'validateUser']);
+        Route::delete('/reject-user/{id}',      [AuthController::class, 'rejectUser']);
     });
 
     // Dashboard
@@ -74,14 +67,16 @@ Route::middleware('jwt.auth')->group(function () {
         Route::delete('/{id}',      [TaskController::class, 'destroy']);
     });
 
-    // Users (admin uniquement pour liste + create + delete)
-    Route::prefix('users')->group(function () {
-        Route::get('/',             [UserController::class, 'index']);
-        Route::post('/',            [UserController::class, 'store']);
-        Route::get('/{id}',         [UserController::class, 'show']);
-        Route::put('/{id}',         [UserController::class, 'update']);
-        Route::delete('/{id}',      [UserController::class, 'destroy']);
-    });
+    // Users
+    // Users
+Route::prefix('users')->group(function () {
+    Route::get('/assignables',  [UserController::class, 'assignables']); // ← VAOVAO
+    Route::get('/',             [UserController::class, 'index']);
+    Route::post('/',            [UserController::class, 'store']);
+    Route::get('/{id}',         [UserController::class, 'show']);
+    Route::put('/{id}',         [UserController::class, 'update']);
+    Route::delete('/{id}',      [UserController::class, 'destroy']);
+});
 
     // Repositories
     Route::prefix('repositories')->group(function () {
@@ -116,9 +111,9 @@ Route::middleware('jwt.auth')->group(function () {
 
     // Chat
     Route::prefix('chat')->group(function () {
-        Route::get('/messages',     [ChatController::class, 'index']);
-        Route::post('/messages',    [ChatController::class, 'store']);
-        Route::delete('/messages',  [ChatController::class, 'clear']);
+        Route::get('/messages',         [ChatController::class, 'index']);
+        Route::post('/messages',        [ChatController::class, 'store']);
+        Route::delete('/messages',      [ChatController::class, 'clear']);
         Route::delete('/messages/{id}', [ChatController::class, 'destroy']);
     });
 
@@ -132,11 +127,10 @@ Route::middleware('jwt.auth')->group(function () {
 
     // Statistics
     Route::get('/statistics', [StatisticsController::class, 'index']);
-
 });
 
 // ── 404 fallback ──────────────────────────────────────────
 Route::fallback(fn() => response()->json([
     'success' => false,
-    'message' => 'Route introuvable. Consultez la documentation API.',
+    'message' => 'Route introuvable.',
 ], 404));

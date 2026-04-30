@@ -5,7 +5,7 @@ import {
   LayoutDashboard,FolderGit2,CheckSquare,GitBranch,
   Server,Code2,BookOpen,MessageSquare,BarChart3,
   Users,Settings,HelpCircle,LogOut,Zap,
-  ChevronLeft,ChevronRight,Database,Shield,
+  ChevronLeft,ChevronRight,Database,Shield,UserCheck,
 } from 'lucide-react'
 import {useAuth} from '../../context/AuthContext.jsx'
 import {useApp} from '../../context/AppContext.jsx'
@@ -13,16 +13,16 @@ import {C,S,ROLE_META} from '../../styles.js'
 import {ini} from '../../data.js'
 
 const NAV=[
-  {sec:'GÉNÉRAL',items:[
+  {sec:'GENERAL',items:[
     {to:'/dashboard',   icon:LayoutDashboard,label:'Tableau de bord',perm:'dashboard'},
     {to:'/projects',    icon:FolderGit2,     label:'Projets',        perm:'projects'},
-    {to:'/tasks',       icon:CheckSquare,    label:'Tâches',         perm:'tasks'},
+    {to:'/tasks',       icon:CheckSquare,    label:'Taches',         perm:'tasks'},
   ]},
-  {sec:'DÉVELOPPEMENT',items:[
+  {sec:'DEVELOPPEMENT',items:[
     {to:'/pipeline',     icon:GitBranch,label:'Pipeline CI/CD',  perm:'pipeline'},
-    {to:'/repositories', icon:Database,  label:'Dépôts Git',     perm:'repositories'},
-    {to:'/environments', icon:Server,    label:'Environnements', perm:'environments'},
-    {to:'/devspace',     icon:Code2,     label:'Espace Dev',     perm:'devspace'},
+    {to:'/repositories', icon:Database,  label:'Depots Git',      perm:'repositories'},
+    {to:'/environments', icon:Server,    label:'Environnements',  perm:'environments'},
+    {to:'/devspace',     icon:Code2,     label:'Espace Dev',      perm:'devspace'},
   ]},
   {sec:'COLLABORATION',items:[
     {to:'/documentation', icon:BookOpen,     label:'Documentation', perm:'documentation'},
@@ -30,17 +30,19 @@ const NAV=[
     {to:'/statistics',    icon:BarChart3,    label:'Statistiques',  perm:'statistics'},
   ]},
   {sec:'ADMIN',items:[
-    {to:'/users',    icon:Users,   label:'Utilisateurs', perm:'users', adminOnly:true},
-    {to:'/settings', icon:Settings,label:'Paramètres',   perm:'settings'},
+    {to:'/users',              icon:Users,      label:'Utilisateurs',       perm:'users',    adminOnly:true},
+    // ← VAOVAO: Validation utilisateurs
+    {to:'/admin/validation',   icon:UserCheck,  label:'Validation comptes', perm:'users',    adminOnly:true},
+    {to:'/settings',           icon:Settings,   label:'Parametres',         perm:'settings'},
   ]},
   {sec:'SUPPORT',items:[
-    {to:'/help',   icon:HelpCircle,label:'Aide & Support',perm:'help'},
-    {to:'/logout', icon:LogOut,    label:'Déconnexion',   perm:'logout'},
+    {to:'/help',   icon:HelpCircle,label:'Aide & Support', perm:'help'},
+    {to:'/logout', icon:LogOut,    label:'Deconnexion',    perm:'logout'},
   ]},
 ]
 
 export default function Sidebar(){
-  const {user,can}          = useAuth()
+  const {user,can}           = useAuth()
   const {sidebar,setSidebar} = useApp()
   const rc = ROLE_META[user?.role]||ROLE_META.dev
   const W  = sidebar ? 240 : 64
@@ -95,9 +97,11 @@ export default function Sidebar(){
                         color:isActive?C.cyan:C.t2,
                         cursor:'pointer',transition:'all 0.18s',
                         borderLeft:isActive?`2px solid ${C.cyan}`:'2px solid transparent',
-                        // Déconnexion en rouge subtil
                         ...(it.to==='/logout'&&!isActive?{color:'rgba(255,45,120,0.7)'}:{}),
                         ...(it.to==='/logout'&&isActive?{color:C.nova,borderLeftColor:C.nova,background:'rgba(255,45,120,0.10)',border:'1px solid rgba(255,45,120,0.22)'}:{}),
+                        // ← VAOVAO: Validation comptes — couleur jaune si admin
+                        ...(it.to==='/admin/validation'&&!isActive?{color:'rgba(255,206,0,0.8)'}:{}),
+                        ...(it.to==='/admin/validation'&&isActive?{color:'#ffce00',borderLeftColor:'#ffce00',background:'rgba(255,206,0,0.10)',border:'1px solid rgba(255,206,0,0.22)'}:{}),
                       }}>
                       <it.icon size={16} style={{flexShrink:0}}/>
                       <AnimatePresence>
@@ -118,11 +122,11 @@ export default function Sidebar(){
         })}
       </nav>
 
-      {/* Bouton réduire */}
+      {/* Bouton reduire */}
       <div style={{padding:'8px 6px',borderTop:`1px solid ${C.border}`}}>
         <button onClick={()=>setSidebar(v=>!v)}
           style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:6,padding:'8px',borderRadius:8,background:'none',border:`1px solid ${C.border}`,color:C.t3,cursor:'pointer',transition:'all 0.2s',fontFamily:'Orbitron,sans-serif',fontSize:10,fontWeight:700}}>
-          {sidebar?<><ChevronLeft size={13}/><span>Réduire</span></>:<ChevronRight size={13}/>}
+          {sidebar?<><ChevronLeft size={13}/><span>Reduire</span></>:<ChevronRight size={13}/>}
         </button>
       </div>
     </motion.aside>
