@@ -99,6 +99,19 @@ jobs:
           docker ps
           echo "PROD deploye sur http://localhost:80"
 
+      - name: Copier APK any PROD releases
+        run: |
+          mkdir -p /srv/releases
+          chmod 755 /srv/releases
+          if ls /srv/test/releases/*.apk 2>/dev/null; then
+            cp /srv/test/releases/*.apk /srv/releases/
+            echo "APK copie any PROD releases"
+          else
+            echo "Tsy misy APK ao amin ny TEST releases"
+          fi
+          ls -lh /srv/releases/
+          echo "APK visible sur http://localhost:80/releases/"
+
   cleanup-test:
     needs: deploy-prod
     runs-on: [self-hosted, test-server]
