@@ -9,38 +9,17 @@ jobs:
 
   deploy-test:
     runs-on: [self-hosted, test-server]
-    environment: staging
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Deployer sur TEST
+      - name: Deploy code sur TEST
         run: |
+          cd /srv/test/app
+          git fetch origin staging
+          git reset --hard origin/staging
           cd /srv/test
-          docker compose up -d
-          sleep 5
+          docker compose up -d --build
+          sleep 10
           docker ps
-          echo "Application visible sur http://localhost:8080"
-
-      - name: Copier APK misy version automatique
-        run: |
-          chmod 755 /srv/test/releases
-          VERSION=$(date +%Y%m%d-%H%M%S)
-          COMMIT=${GITHUB_SHA::7}
-          echo "Jerena releases folder:"
-          ls -lh $GITHUB_WORKSPACE/releases/
-          if ls $GITHUB_WORKSPACE/releases/*.apk 2>/dev/null; then
-            for apk in $GITHUB_WORKSPACE/releases/*.apk; do
-              if [ -f "$apk" ]; then
-                BASENAME=$(basename "$apk" .apk)
-                cp "$apk" "/srv/test/releases/${BASENAME}-${VERSION}-${COMMIT}.apk"
-                echo "APK copie: ${BASENAME}-${VERSION}-${COMMIT}.apk"
-              fi
-            done
-          else
-            echo "Tsy misy APK vaovao ao amin ny releases/"
-          fi
-          ls -lh /srv/test/releases/
+          echo "Application visible sur http://192.168.137.130:8080"
 
   validation-agent:
     needs: deploy-test
@@ -49,9 +28,7 @@ jobs:
       name: agent-approval
     steps:
       - name: Validation agent
-        run: |
-          echo "APK visible sur http://localhost:8080/releases/"
-          ls -lh /srv/test/releases/
+        run: echo "Agent a approuve"
 
   validation-chef:
     needs: validation-agent
@@ -66,7 +43,7 @@ jobs:
     needs: validation-chef
     runs-on: [self-hosted, test-server]
     steps:
-      - name: Creer archive avy amin ny TEST
+      - name: Creer archive
         run: |
           mkdir -p /srv/test/archives
           rm -f /srv/test/archives/projet.tar.gz
@@ -77,47 +54,40 @@ jobs:
             --exclude='storage/logs' \
             --exclude='storage/framework/cache' \
             -C /srv/test/app \
-            frontend backend
+            frontend backend database
           ls -lh /srv/test/archives/projet.tar.gz
           echo "Archive vita"
 
   deploy-prod:
     needs: extract
-    runs-on: [self-hosted, prod-runner]
+    runs-on: [self-hosted, test-server]
     steps:
+      - name: Envoyer archive any PROD
+        run: |
+          scp /srv/test/archives/projet.tar.gz deployer@192.168.137.96:/srv/prod/
+          echo "Archive envoyee any PROD"
+
       - name: Deploy any PROD
         run: |
-          echo "Reception archive avy amin ny TEST"
-          ls -lh /srv/test/archives/projet.tar.gz
-          mkdir -p /srv/prod/app/frontend
-          mkdir -p /srv/prod/app/backend
-          tar -xzf /srv/test/archives/projet.tar.gz -C /srv/prod/app/
-          cd /srv/prod
-          docker compose -f docker-compose.prod.yml down --remove-orphans
-          docker compose -f docker-compose.prod.yml up -d --build
-          sleep 10
-          docker ps
-          echo "PROD deploye sur http://localhost:80"
-
-      - name: Copier APK any PROD releases
-        run: |
-          mkdir -p /srv/releases
-          chmod 755 /srv/releases
-          if ls /srv/test/releases/*.apk 2>/dev/null; then
-            cp /srv/test/releases/*.apk /srv/releases/
-            echo "APK copie any PROD releases"
-          else
-            echo "Tsy misy APK ao amin ny TEST releases"
-          fi
-          ls -lh /srv/releases/
-          echo "APK visible sur http://localhost:80/releases/"
+          ssh deployer@192.168.137.96 "
+            mkdir -p /srv/prod/app/frontend &&
+            mkdir -p /srv/prod/app/backend &&
+            mkdir -p /srv/prod/app/database &&
+            tar -xzf /srv/prod/projet.tar.gz -C /srv/prod/app/ &&
+            cd /srv/prod &&
+            docker compose -f docker-compose.prod.yml down --remove-orphans &&
+            docker compose -f docker-compose.prod.yml up -d --build &&
+            sleep 10 &&
+            docker ps &&
+            echo PROD deploye sur http://192.168.137.96:80
+          "
 
   cleanup-test:
     needs: deploy-prod
     runs-on: [self-hosted, test-server]
     steps:
-      - name: Retirer APK du TEST
+      - name: Cleanup TEST
         run: |
-          rm -rf /srv/test/releases/*
-          chmod 755 /srv/test/releases
-          echo "APK retire du TEST - disponible uniquement sur PROD"
+          cd /srv/test
+          docker compose down
+          echo "TEST arrete - application sur PROD uniquement"
