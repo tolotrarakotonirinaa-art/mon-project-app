@@ -14,8 +14,7 @@ jobs:
         run: |
           cd /srv/test/app
           git fetch origin
-          git checkout staging 2>/dev/null || git checkout -b staging
-          git reset --hard origin/staging
+          git reset --hard origin/master
           cd /srv/test
           docker compose up -d --build
           sleep 10
