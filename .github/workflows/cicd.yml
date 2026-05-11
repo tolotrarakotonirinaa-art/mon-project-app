@@ -19,7 +19,7 @@ jobs:
           docker compose up -d --build
           sleep 10
           docker ps
-          echo "Application visible sur http://192.168.137.130:8080"
+          echo "Application visible sur http://192.168.137.57:8080"
 
   validation-agent:
     needs: deploy-test
