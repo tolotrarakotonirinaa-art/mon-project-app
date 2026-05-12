@@ -1,7 +1,7 @@
-FROM node:18-alpine AS build
+FROM node:20-alpine AS build
 WORKDIR /app
 COPY package*.json ./
-RUN npm install --legacy-peer-deps
+RUN npm install --legacy-peer-deps && npm install rollup@4.9.0 --save-dev
 COPY . .
 RUN npm run build
 FROM nginx:alpine
