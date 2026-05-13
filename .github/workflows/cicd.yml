@@ -77,7 +77,8 @@ jobs:
             cd /srv/prod &&
             docker compose -f docker-compose.prod.yml down --remove-orphans &&
             docker compose -f docker-compose.prod.yml up -d --build &&
-            sleep 10 &&
+            sleep 15 &&
+            bash /srv/prod/deploy-post.sh &&
             docker ps &&
             echo PROD deploye sur http://192.168.137.96:80
           "
