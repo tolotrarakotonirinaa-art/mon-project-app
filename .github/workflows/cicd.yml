@@ -15,6 +15,7 @@ jobs:
           cd /srv/test/app
           git fetch origin
           git reset --hard origin/staging
+          sed -i 's/DB_HOST=127.0.0.1/DB_HOST=test-database/g' /srv/test/app/backend/.env
           cd /srv/test
           docker compose up -d --build
           sleep 10
