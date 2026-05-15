@@ -50,12 +50,10 @@ jobs:
           rm -f /srv/test/archives/projet.tar.gz
           tar -czf /srv/test/archives/projet.tar.gz \
             --exclude='.git' \
-            --exclude='node_modules' \
-            --exclude='vendor' \
             --exclude='storage/logs' \
             --exclude='storage/framework/cache' \
             -C /srv/test/app \
-            frontend backend database
+            frontend backend
           ls -lh /srv/test/archives/projet.tar.gz
           echo "Archive vita"
 
