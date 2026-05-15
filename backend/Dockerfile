@@ -1,9 +1,5 @@
-FROM php:8.2-fpm-alpine
+FROM webdevops/php:8.2-alpine
 WORKDIR /var/www/html
-
-RUN apk add --no-cache \
-    curl libpng-dev libxml2-dev libpq-dev oniguruma-dev zip unzip \
-    && docker-php-ext-install pdo pdo_pgsql mbstring exif pcntl bcmath gd
 
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 COPY composer.json composer.lock ./
