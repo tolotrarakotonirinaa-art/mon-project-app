@@ -1683,3 +1683,5 @@ LINE 1: ...tasks\" set \"status\" = $1, \"updated_at\" = $2 where \"date_debu...
 #51 E:/local/backend/vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php(23): require_once('E://local//backen...')
 #52 {main}
 "} 
+[2026-05-14 11:53:39] local.ERROR: Erreur envoi email inscription: Connection could not be established with host "sandbox.smtp.mailtrap.io:2525": stream_socket_client(): php_network_getaddresses: getaddrinfo for sandbox.smtp.mailtrap.io failed: H�te inconnu.   
+[2026-05-14 11:54:25] local.ERROR: Erreur envoi email validation: Connection could not be established with host "sandbox.smtp.mailtrap.io:2525": stream_socket_client(): php_network_getaddresses: getaddrinfo for sandbox.smtp.mailtrap.io failed: H�te inconnu.   
