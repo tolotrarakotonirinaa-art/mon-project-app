@@ -3,14 +3,14 @@
 *.zip
 *.log
 
+# dependencies
+node_modules/
+vendor/
+
 # env
 .env
 .env.local
-.env.*.local
 
 # dist
 dist/
 build/
-
-# git
-.git/
