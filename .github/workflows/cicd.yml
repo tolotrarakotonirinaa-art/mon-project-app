@@ -7,6 +7,7 @@ on:
 
 jobs:
 
+  # ÉTAPE 1 — Déploiement automatique TEST
   deploy-test:
     runs-on: [self-hosted, test-server]
     steps:
@@ -20,31 +21,24 @@ jobs:
           docker compose up -d --build
           sleep 10
           docker ps
-          echo "Application visible sur http://192.168.137.57:8080"
+          echo "Application visible sur http://192.168.137.68:8080"
 
+  # ÉTAPE 2 — Agent testeur valide dans le navigateur
   validation-agent:
     needs: deploy-test
     runs-on: [self-hosted, test-server]
     environment:
       name: agent-approval
     steps:
-      - name: Validation agent
-        run: echo "Agent a approuve"
+      - name: Validation agent testeur
+        run: echo "Agent a approuve - application OK sur TEST"
 
-  validation-chef:
+  # ÉTAPE 3 — Extraction archive depuis TEST (le projet validé)
+  extract:
     needs: validation-agent
     runs-on: [self-hosted, test-server]
-    environment:
-      name: production-approval
     steps:
-      - name: Validation chef
-        run: echo "Chef a approuve"
-
-  extract:
-    needs: validation-chef
-    runs-on: [self-hosted, test-server]
-    steps:
-      - name: Creer archive
+      - name: Creer archive depuis TEST
         run: |
           mkdir -p /srv/test/archives
           rm -f /srv/test/archives/projet.tar.gz
@@ -56,18 +50,41 @@ jobs:
             -C /srv/test/app \
             frontend backend database
           ls -lh /srv/test/archives/projet.tar.gz
-          echo "Archive vita"
+          echo "Archive creee depuis TEST valide"
 
-  deploy-prod:
+  # ÉTAPE 4 — APK retiré du TEST automatiquement
+  cleanup-test:
     needs: extract
     runs-on: [self-hosted, test-server]
     steps:
-      - name: Envoyer archive any PROD
+      - name: Retirer APK du serveur TEST
+        run: |
+          cd /srv/test
+          docker compose down --remove-orphans
+          echo "TEST arrete - APK retire du serveur TEST"
+          echo "Archive conservee dans /srv/test/archives/projet.tar.gz"
+
+  # ÉTAPE 5 — Chef de projet autorise la mise en prod
+  validation-chef:
+    needs: cleanup-test
+    runs-on: [self-hosted, test-server]
+    environment:
+      name: production-approval
+    steps:
+      - name: Validation chef de projet
+        run: echo "Chef a approuve - deploiement PROD autorise"
+
+  # ÉTAPE 6 — Déploiement PROD (accessible navigateur)
+  deploy-prod:
+    needs: validation-chef
+    runs-on: [self-hosted, test-server]
+    steps:
+      - name: Envoyer archive vers PROD
         run: |
           scp /srv/test/archives/projet.tar.gz deployer@192.168.137.96:/srv/prod/
-          echo "Archive envoyee any PROD"
+          echo "Archive envoyee vers PROD"
 
-      - name: Deploy any PROD
+      - name: Deployer sur PROD
         run: |
           ssh deployer@192.168.137.96 "
             mkdir -p /srv/prod/app/frontend &&
@@ -80,15 +97,5 @@ jobs:
             sleep 15 &&
             bash /srv/prod/deploy-post.sh &&
             docker ps &&
-            echo PROD deploye sur http://192.168.137.96:80
+            echo 'PROD deploye - Client accede sur http://192.168.137.96:80'
           "
-
-  cleanup-test:
-    needs: deploy-prod
-    runs-on: [self-hosted, test-server]
-    steps:
-      - name: Cleanup TEST
-        run: |
-          cd /srv/test
-          docker compose down
-          echo "TEST arrete - application sur PROD uniquement"
