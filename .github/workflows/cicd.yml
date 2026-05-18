@@ -44,13 +44,14 @@ jobs:
           rm -f /srv/test/archives/projet.tar.gz
           tar -czf /srv/test/archives/projet.tar.gz \
             --exclude='.git' \
-            --exclude='node_modules' \
             --exclude='storage/logs' \
             --exclude='storage/framework/cache' \
+            --exclude='storage/framework/sessions' \
+            --exclude='storage/framework/views' \
             -C /srv/test/app \
             frontend backend database
           ls -lh /srv/test/archives/projet.tar.gz
-          echo "Archive creee depuis TEST valide"
+          echo "Archive creee avec vendor et node_modules"
 
   # ÉTAPE 4 — APK retiré du TEST automatiquement
   cleanup-test:

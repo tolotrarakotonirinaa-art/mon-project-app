@@ -1,16 +1,16 @@
- # build files
+# build files
 *.apk
 *.zip
 *.log
 
-# dependencies
-node_modules/
-vendor/
-
 # env
-.envnode_modules/
-frontend/node_modules/
-backend/node_modules/
+.env
+.env.local
+.env.*.local
+
+# dist
 dist/
 build/
-.envgit/ 
+
+# git
+.git/
