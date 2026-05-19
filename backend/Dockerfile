@@ -1,11 +1,9 @@
-FROM php:8.2-alpine
+FROM php:8.2-fpm-alpine
 WORKDIR /var/www/html
 
-RUN apk add --no-cache libpq oniguruma \
-    && apk add --no-cache --virtual .build-deps \
-        $PHPIZE_DEPS libpq-dev oniguruma-dev \
-    && docker-php-ext-install pdo pdo_pgsql mbstring \
-    && apk del .build-deps
+RUN apk add --no-cache libpq oniguruma libpng \
+    && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
+    && docker-php-ext-install pdo pdo_pgsql
 
 COPY . .
 RUN chown -R www-data:www-data /var/www/html/storage \
