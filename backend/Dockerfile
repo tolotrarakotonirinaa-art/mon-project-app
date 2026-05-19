@@ -1,18 +1,10 @@
 FROM php:8.2-alpine
 WORKDIR /var/www/html
 
-RUN apk add --no-cache \
-    libpq \
-    oniguruma \
-    libpng \
-    libxml2 \
+RUN apk add --no-cache libpq oniguruma \
     && apk add --no-cache --virtual .build-deps \
-    $PHPIZE_DEPS \
-    libpq-dev \
-    oniguruma-dev \
-    libpng-dev \
-    libxml2-dev \
-    && docker-php-ext-install pdo pdo_pgsql mbstring gd \
+        $PHPIZE_DEPS libpq-dev oniguruma-dev \
+    && docker-php-ext-install pdo pdo_pgsql mbstring \
     && apk del .build-deps
 
 COPY . .
