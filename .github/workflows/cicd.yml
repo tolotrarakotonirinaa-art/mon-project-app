@@ -19,26 +19,55 @@ jobs:
           sed -i 's/DB_HOST=127.0.0.1/DB_HOST=test-database/g' /srv/test/app/backend/.env
           cd /srv/test
           docker compose up -d --build
-          sleep 10
+          sleep 15
+          echo "=== HEALTH CHECK ==="
+          curl -f http://localhost:8080/api/health && echo "Backend OK" || echo "Backend FAILED"
           docker ps
-          echo "Application visible sur http://192.168.137.68:8080"
+          echo "========================================="
+          echo "APPLICATION DISPONIBLE SUR TEST"
+          echo "http://192.168.137.57:8080"
+          echo "========================================="
 
-  # ÉTAPE 2 — Agent testeur valide dans le navigateur
+  # ÉTAPE 2 — Agent teste l'application dans le navigateur
   validation-agent:
     needs: deploy-test
     runs-on: [self-hosted, test-server]
     environment:
       name: agent-approval
     steps:
-      - name: Validation agent testeur
-        run: echo "Agent a approuve - application OK sur TEST"
+      - name: En attente validation agent testeur
+        run: |
+          echo "========================================="
+          echo "AGENT - Testez l application sur :"
+          echo "http://192.168.137.57:8080"
+          echo "-----------------------------------------"
+          echo "Approuvez si OK"
+          echo "Rejetez avec commentaire si probleme"
+          echo "========================================="
 
-  # ÉTAPE 3 — Extraction archive depuis TEST (le projet validé)
-  extract:
+  # ÉTAPE 3 — Chef de projet valide dans le navigateur
+  validation-chef:
     needs: validation-agent
     runs-on: [self-hosted, test-server]
+    environment:
+      name: production-approval
     steps:
-      - name: Creer archive depuis TEST
+      - name: En attente validation chef de projet
+        run: |
+          echo "========================================="
+          echo "CHEF - Verifiez l application sur :"
+          echo "http://192.168.137.57:8080"
+          echo "-----------------------------------------"
+          echo "Approuvez pour deployer en PROD"
+          echo "Rejetez avec commentaire si probleme"
+          echo "========================================="
+
+  # ÉTAPE 4 — Extraction archive depuis TEST validé
+  extract:
+    needs: validation-chef
+    runs-on: [self-hosted, test-server]
+    steps:
+      - name: Creer archive depuis TEST valide
         run: |
           mkdir -p /srv/test/archives
           rm -f /srv/test/archives/projet.tar.gz
@@ -51,9 +80,9 @@ jobs:
             -C /srv/test/app \
             frontend backend database
           ls -lh /srv/test/archives/projet.tar.gz
-          echo "Archive creee avec vendor et node_modules"
+          echo "Archive creee depuis TEST valide"
 
-  # ÉTAPE 4 — APK retiré du TEST automatiquement
+  # ÉTAPE 5 — APK retiré du TEST automatiquement
   cleanup-test:
     needs: extract
     runs-on: [self-hosted, test-server]
@@ -63,31 +92,20 @@ jobs:
           cd /srv/test
           docker compose down --remove-orphans
           echo "TEST arrete - APK retire du serveur TEST"
-          echo "Archive conservee dans /srv/test/archives/projet.tar.gz"
 
-  # ÉTAPE 5 — Chef de projet autorise la mise en prod
-  validation-chef:
-    needs: cleanup-test
-    runs-on: [self-hosted, test-server]
-    environment:
-      name: production-approval
-    steps:
-      - name: Validation chef de projet
-        run: echo "Chef a approuve - deploiement PROD autorise"
-
-  # ÉTAPE 6 — Déploiement PROD (accessible navigateur)
+  # ÉTAPE 6 — Déploiement PROD accessible navigateur
   deploy-prod:
-    needs: validation-chef
+    needs: cleanup-test
     runs-on: [self-hosted, test-server]
     steps:
       - name: Envoyer archive vers PROD
         run: |
-          scp /srv/test/archives/projet.tar.gz deployer@192.168.137.96:/srv/prod/
+          scp /srv/test/archives/projet.tar.gz deployer@192.168.137.144:/srv/prod/
           echo "Archive envoyee vers PROD"
 
       - name: Deployer sur PROD
         run: |
-          ssh deployer@192.168.137.96 "
+          ssh deployer@192.168.137.144 "
             mkdir -p /srv/prod/app/frontend &&
             mkdir -p /srv/prod/app/backend &&
             mkdir -p /srv/prod/app/database &&
@@ -98,5 +116,5 @@ jobs:
             sleep 15 &&
             bash /srv/prod/deploy-post.sh &&
             docker ps &&
-            echo 'PROD deploye - Client accede sur http://192.168.137.96:80'
+            echo 'PROD deploye - Client accede sur http://192.168.137.144:80'
           "
