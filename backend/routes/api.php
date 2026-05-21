@@ -11,6 +11,7 @@ use App\Http\Controllers\EnvironmentController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\StatisticsController;
+use App\Http\Controllers\FileController;
 use App\Http\Controllers\DashboardController;
 
 // ── Health check ──────────────────────────────────────────
@@ -37,7 +38,6 @@ Route::middleware('jwt.auth')->group(function () {
         Route::put('/password',         [AuthController::class, 'changePassword']);
         Route::put('/profile',          [AuthController::class, 'updateProfile']);
 
-        // ← VAOVAO: Admin validation routes
         Route::get('/pending-users',            [AuthController::class, 'pendingUsers']);
         Route::patch('/validate-user/{id}',     [AuthController::class, 'validateUser']);
         Route::delete('/reject-user/{id}',      [AuthController::class, 'rejectUser']);
@@ -68,15 +68,14 @@ Route::middleware('jwt.auth')->group(function () {
     });
 
     // Users
-    // Users
-Route::prefix('users')->group(function () {
-    Route::get('/assignables',  [UserController::class, 'assignables']); // ← VAOVAO
-    Route::get('/',             [UserController::class, 'index']);
-    Route::post('/',            [UserController::class, 'store']);
-    Route::get('/{id}',         [UserController::class, 'show']);
-    Route::put('/{id}',         [UserController::class, 'update']);
-    Route::delete('/{id}',      [UserController::class, 'destroy']);
-});
+    Route::prefix('users')->group(function () {
+        Route::get('/assignables',  [UserController::class, 'assignables']);
+        Route::get('/',             [UserController::class, 'index']);
+        Route::post('/',            [UserController::class, 'store']);
+        Route::get('/{id}',         [UserController::class, 'show']);
+        Route::put('/{id}',         [UserController::class, 'update']);
+        Route::delete('/{id}',      [UserController::class, 'destroy']);
+    });
 
     // Repositories
     Route::prefix('repositories')->group(function () {
@@ -127,6 +126,15 @@ Route::prefix('users')->group(function () {
 
     // Statistics
     Route::get('/statistics', [StatisticsController::class, 'index']);
+
+    // Depot Fichiers
+    Route::prefix('files')->group(function () {
+        Route::get('/',              [FileController::class, 'index']);
+        Route::post('/',             [FileController::class, 'store']);
+        Route::delete('/{id}',       [FileController::class, 'destroy']);
+        Route::get('/{id}/download', [FileController::class, 'download']);
+    });
+
 });
 
 // ── 404 fallback ──────────────────────────────────────────

@@ -94,7 +94,6 @@ export const api = {
   login: (email, password) =>
     request('POST', '/auth/login', { email, password }),
 
-  // timeout 30s — misy mail sending
   register: (name, email, password, role) =>
     request('POST', '/auth/register', { name, email, password, role }, 30000),
 
@@ -109,7 +108,6 @@ export const api = {
   pendingUsers: () =>
     request('GET', '/auth/pending-users'),
 
-  // timeout 30s — misy mail sending
   validateUser: (id) =>
     request('PATCH', `/auth/validate-user/${id}`, null, 30000),
 
@@ -145,14 +143,62 @@ export const api = {
   createUser: (data)       => request('POST',   '/users', data),
   updateUser: (id, data)   => request('PUT',    `/users/${id}`, data),
   deleteUser: (id)         => request('DELETE', `/users/${id}`),
-  getAssignables: () => request('GET', '/users/assignables'),
+  getAssignables: ()       => request('GET',    '/users/assignables'),
 
-  getRepos:   ()           => request('GET',    '/repositories'),
-  getRepo:    (id)         => request('GET',    `/repositories/${id}`),
-  createRepo: (data)       => request('POST',   '/repositories', data),
-  updateRepo: (id, data)   => request('PUT',    `/repositories/${id}`, data),
-  deleteRepo: (id)         => request('DELETE', `/repositories/${id}`),
-  starRepo:   (id)         => request('POST',   `/repositories/${id}/star`),
+  // ── Dépôt de Fichiers (remplace Git repositories) ────
+  getFiles:  ()            => request('GET',    '/files'),
+  getFile:   (id)          => request('GET',    `/files/${id}`),
+  deleteFile:(id)          => request('DELETE', `/files/${id}`),
+
+  // Upload multipart/form-data — pas de JSON
+  uploadFile: async (file, description='') => {
+    const token = localStorage.getItem('dv4_token')
+    const form  = new FormData()
+    form.append('file', file)
+    if(description) form.append('description', description)
+
+    try {
+      const res = await fetch(`${API_URL}/files`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          // NE PAS mettre Content-Type ici — le browser le met automatiquement avec boundary
+        },
+        body: form,
+        signal: AbortSignal.timeout(60000), // 60s pour les gros fichiers
+      })
+      if(res.status === 401){
+        localStorage.removeItem('dv4_token')
+        window.location.href = '/login'
+        return { success:false, message:'Session expirée.' }
+      }
+      return await res.json()
+    } catch(err) {
+      return { success:false, message: err?.message||'Erreur upload' }
+    }
+  },
+
+  // Téléchargement — crée un lien temporaire
+  downloadFile: async (id, filename='fichier') => {
+    const token = localStorage.getItem('dv4_token')
+    const res = await fetch(`${API_URL}/files/${id}/download`, {
+      headers: {
+        'Accept': '*/*',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+      signal: AbortSignal.timeout(60000),
+    })
+    if(!res.ok) throw new Error('Téléchargement échoué')
+    const blob = await res.blob()
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href     = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+    return { success:true }
+  },
 
   getEnvs:    ()           => request('GET',    '/environments'),
   getEnv:     (id)         => request('GET',    `/environments/${id}`),

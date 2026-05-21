@@ -3,10 +3,9 @@ import {api} from '../services/api.js'
 
 const Ctx = createContext(null)
 
-// ── Helper : extraire les données ou retourner null si offline ─
 function getData(res, fallback=[]){
   if(!res)         return fallback
-  if(res.offline)  return fallback   // backend coupé en cours d'utilisation
+  if(res.offline)  return fallback
   if(!res.success) return fallback
   return res.data ?? fallback
 }
@@ -17,13 +16,11 @@ export function AppProvider({children}){
   const [modal,      setModal]       = useState(null)
   const [notifBadge, setNotifBadge]  = useState(0)
 
-  // ── Toast ─────────────────────────────────────────────
   const showToast = useCallback((msg, type='info')=>{
     setToast({msg, type, id:Date.now()})
     setTimeout(()=>setToast(null), 3800)
   },[])
 
-  // ── Modal ─────────────────────────────────────────────
   const openModal  = useCallback(cfg=>setModal(cfg),[])
   const closeModal = useCallback(()=>setModal(null),[])
 
@@ -40,10 +37,11 @@ export function AppProvider({children}){
   const deleteTask = id       => api.deleteTask(id)
   const moveTask   = (id,s)   => api.moveTask(id,s)
 
-  // ── Dépôts ────────────────────────────────────────────
-  const getRepos   = ()      => api.getRepos().then(r=>getData(r,[]))
-  const addRepo    = data    => api.createRepo(data)
-  const deleteRepo = id      => api.deleteRepo(id)
+  // ── Dépôt de Fichiers (remplace Git repos) ────────────
+  const getFiles    = ()              => api.getFiles().then(r=>getData(r,[]))
+  const uploadFile  = (file, desc='') => api.uploadFile(file, desc)
+  const deleteFile  = id              => api.deleteFile(id)
+  const downloadFile= (id, filename)  => api.downloadFile(id, filename)
 
   // ── Environnements ────────────────────────────────────
   const getEnvs   = ()      => api.getEnvs().then(r=>getData(r,[]))
@@ -90,7 +88,7 @@ export function AppProvider({children}){
       notifBadge, setNotifBadge,
       getProjects, addProject, updateProject, deleteProject,
       getTasks, addTask, updateTask, deleteTask, moveTask,
-      getRepos, addRepo, deleteRepo,
+      getFiles, uploadFile, deleteFile, downloadFile,
       getEnvs, addEnv, deleteEnv,
       getPipe, getPipeLogs,
       getChat, addMsg, clearChat,
