@@ -7,12 +7,109 @@ import {useAuth} from '../context/AuthContext.jsx'
 import {checkServer} from '../services/api.js'
 import {C,S} from '../styles.js'
 
+// ─── Mettre le logo dans /public/mtefop-logo.jpg ───────────
+const LOGO_SRC = '/mtefop-logo.jpg'
+
+const NOM_ENTREPRISE = 'MINISTÈRE DU TRAVAIL, DE L\'EMPLOI ET DE LA FONCTION PUBLIQUE'
+const NOM_COURT      = 'MTEFOP'
+
 const ROLES=[
   {id:'admin', icon:Shield,    color:'#ff2d78',label:'Admin',       desc:'Acces total',  perms:['Gestion utilisateurs','Deploiements','Tous les outils','Config']},
   {id:'dev',   icon:Code2,     color:'#00c8ff',label:'Developpeur', desc:'Acces dev',    perms:['Pipeline CI/CD','Depots Git','Environnements','Espace dev']},
   {id:'client',icon:UserCheck, color:'#00ff88',label:'Client',      desc:'Vue projet',   perms:['Dashboard','Projets (lecture)','Documentation','Chat']},
 ]
 
+// ════════════════════════════════════════════
+//  Animation nom entreprise — lettre par lettre
+// ════════════════════════════════════════════
+function AnimatedEnterpriseName() {
+  const words = NOM_ENTREPRISE.split(' ')
+
+  return (
+    <div style={{ textAlign: 'center', marginBottom: 6 }}>
+      {/* Logo */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.6, rotate: -10 }}
+        animate={{ opacity: 1, scale: 1, rotate: 0 }}
+        transition={{ duration: 0.8, ease: 'backOut' }}
+        style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}
+      >
+        <motion.div
+          animate={{ boxShadow: ['0 0 0px rgba(0,200,255,0)', '0 0 30px rgba(0,200,255,0.5)', '0 0 0px rgba(0,200,255,0)'] }}
+          transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+          style={{ borderRadius: '50%', padding: 4, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(0,200,255,0.2)' }}
+        >
+          <img
+            src={LOGO_SRC}
+            alt="Logo MTEFOP"
+            style={{ width: 90, height: 90, borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+          />
+        </motion.div>
+      </motion.div>
+
+      {/* Nom court animé */}
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 2, marginBottom: 8 }}>
+        {NOM_COURT.split('').map((char, i) => (
+          <motion.span
+            key={i}
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 + i * 0.07, duration: 0.4, ease: 'backOut' }}
+            style={{
+              fontFamily: 'Orbitron, sans-serif',
+              fontWeight: 900,
+              fontSize: 22,
+              background: 'linear-gradient(135deg, #00c8ff, #7c3aed, #00ff88)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+            }}
+          >
+            {char}
+          </motion.span>
+        ))}
+      </div>
+
+      {/* Ligne décorative */}
+      <motion.div
+        initial={{ scaleX: 0 }}
+        animate={{ scaleX: 1 }}
+        transition={{ delay: 0.8, duration: 0.6, ease: 'easeOut' }}
+        style={{
+          height: 1,
+          background: 'linear-gradient(90deg, transparent, rgba(0,200,255,0.5), transparent)',
+          marginBottom: 8,
+        }}
+      />
+
+      {/* Nom complet — mot par mot */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '0 6px', maxWidth: 420, margin: '0 auto' }}>
+        {words.map((word, wi) => (
+          <motion.span
+            key={wi}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.9 + wi * 0.08, duration: 0.35 }}
+            style={{
+              fontSize: 10,
+              fontFamily: 'Orbitron, sans-serif',
+              fontWeight: 700,
+              color: C.t2,
+              letterSpacing: '0.08em',
+              lineHeight: 1.8,
+            }}
+          >
+            {word}
+          </motion.span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════
+//  MAIN
+// ════════════════════════════════════════════
 export default function Login(){
   const {login}  = useAuth()
   const navigate = useNavigate()
@@ -76,44 +173,174 @@ export default function Login(){
       {/* Panneau gauche */}
       <motion.div initial={{opacity:0,x:-40}} animate={{opacity:1,x:0}} transition={{duration:0.8}}
         style={{display:'flex',flexDirection:'column',justifyContent:'space-between',width:'50%',minWidth:400,padding:56,position:'relative',zIndex:10}}>
-        <div style={{display:'flex',alignItems:'center',gap:12}}>
-          <div style={{width:42,height:42,borderRadius:12,background:'linear-gradient(135deg,#00c8ff,#7c3aed)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 0 22px rgba(0,200,255,0.5)'}}>
-            <Zap size={20} style={{color:'#020408'}}/>
-          </div>
-          <div>
-            <div style={{fontFamily:'Orbitron,sans-serif',fontWeight:900,fontSize:17,background:'linear-gradient(135deg,#00c8ff,#e8f4ff)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text'}}>DEV ENVIRON</div>
-            <div style={{fontFamily:'Orbitron,sans-serif',fontWeight:700,fontSize:9,letterSpacing:'0.25em',color:C.t3}}>4D PLATFORM</div>
-          </div>
+
+        {/* Logo + Nom entreprise — panneau gauche */}
+        <div>
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 8 }}
+          >
+            <motion.div
+              animate={{ boxShadow: ['0 0 0px rgba(0,200,255,0)', '0 0 20px rgba(0,200,255,0.4)', '0 0 0px rgba(0,200,255,0)'] }}
+              transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+              style={{ borderRadius: '50%', flexShrink: 0 }}
+            >
+              <img
+                src={LOGO_SRC}
+                alt="Logo MTEFOP"
+                style={{ width: 54, height: 54, borderRadius: '50%', objectFit: 'cover', display: 'block', border: '2px solid rgba(0,200,255,0.3)' }}
+              />
+            </motion.div>
+            <div>
+              {/* Nom court lettre par lettre */}
+              <div style={{ display: 'flex', gap: 1 }}>
+                {NOM_COURT.split('').map((char, i) => (
+                  <motion.span
+                    key={i}
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 + i * 0.07, duration: 0.35, ease: 'backOut' }}
+                    style={{
+                      fontFamily: 'Orbitron, sans-serif',
+                      fontWeight: 900,
+                      fontSize: 17,
+                      background: 'linear-gradient(135deg,#00c8ff,#e8f4ff)',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      backgroundClip: 'text',
+                    }}
+                  >
+                    {char}
+                  </motion.span>
+                ))}
+              </div>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 1, duration: 0.5 }}
+                style={{ fontFamily: 'Orbitron,sans-serif', fontWeight: 700, fontSize: 9, letterSpacing: '0.25em', color: C.t3 }}
+              >
+                DEV EN EQUIPE
+              </motion.div>
+            </div>
+          </motion.div>
+
+          {/* Nom complet entreprise — marquee défilant (style plaque pharmacie) */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.8, duration: 0.6 }}
+            style={{
+              padding: '10px 0',
+              background: 'linear-gradient(90deg, rgba(0,200,255,0.07), rgba(124,58,237,0.05))',
+              borderLeft: '2px solid rgba(0,200,255,0.4)',
+              borderRadius: '0 8px 8px 0',
+              marginBottom: 0,
+              overflow: 'hidden',
+              position: 'relative',
+              maxWidth: 400,
+            }}
+          >
+            {/* Dégradés de fondu sur les bords pour effet plaque LED */}
+            <div style={{
+              position: 'absolute', top: 0, left: 0, bottom: 0, width: 24, zIndex: 2,
+              background: 'linear-gradient(90deg, rgba(8,16,28,1), transparent)',
+            }} />
+            <div style={{
+              position: 'absolute', top: 0, right: 0, bottom: 0, width: 24, zIndex: 2,
+              background: 'linear-gradient(270deg, rgba(8,16,28,1), transparent)',
+            }} />
+
+            <div style={{ overflow: 'hidden', whiteSpace: 'nowrap' }}>
+              <motion.div
+                animate={{ x: ['0%', '-50%'] }}
+                transition={{ duration: 16, repeat: Infinity, ease: 'linear' }}
+                style={{ display: 'inline-flex', whiteSpace: 'nowrap' }}
+              >
+                {[0, 1].map(rep => (
+                  <span
+                    key={rep}
+                    style={{
+                      fontSize: 11,
+                      fontFamily: 'Orbitron, sans-serif',
+                      fontWeight: 700,
+                      color: C.cyan,
+                      letterSpacing: '0.12em',
+                      textShadow: '0 0 8px rgba(0,200,255,0.6)',
+                      paddingRight: 48,
+                    }}
+                  >
+                    {NOM_ENTREPRISE} &nbsp;•&nbsp;
+                  </span>
+                ))}
+              </motion.div>
+            </div>
+          </motion.div>
         </div>
 
         <div>
-          <motion.h1 initial={{opacity:0,y:30}} animate={{opacity:1,y:0}} transition={{delay:0.3}}
-            style={{fontFamily:'Orbitron,sans-serif',fontWeight:900,fontSize:42,lineHeight:1.15,marginBottom:18}}>
-            <span style={{color:C.t1}}>DEVELOPPEZ{'\n'}EN </span>
-            <span style={{background:'linear-gradient(135deg,#00c8ff,#7c3aed,#00ff88)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text'}}>4 DIMENSIONS</span>
-          </motion.h1>
-          <p style={{color:C.t2,fontSize:15,lineHeight:1.7,maxWidth:360,marginBottom:28}}>Plateforme SaaS next-gen. Pipeline CI/CD, espaces dev, chat equipe dans une interface immersive.</p>
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25, duration: 0.7, ease: 'easeOut' }}
+            style={{ marginBottom: 18 }}
+          >
+            <p style={{
+              fontFamily: 'Orbitron, sans-serif',
+              fontWeight: 700,
+              fontSize: 11,
+              letterSpacing: '0.35em',
+              color: C.cyan,
+              marginBottom: 8,
+              opacity: 0.85,
+            }}>
+              PLATEFORME
+            </p>
+            <h1 style={{
+              fontFamily: 'Orbitron, sans-serif',
+              fontWeight: 800,
+              fontSize: 32,
+              lineHeight: 1.35,
+              letterSpacing: '0.01em',
+              background: 'linear-gradient(120deg,#e8f4ff 0%,#00c8ff 45%,#7c3aed 75%,#00ff88 100%)',
+              backgroundSize: '200% auto',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+              animation: 'shimmerTitle 6s ease-in-out infinite',
+            }}>
+              ENVIRONNEMENT DE DÉVELOPPEMENT EN ÉQUIPE
+            </h1>
+            <style>{`
+              @keyframes shimmerTitle {
+                0%, 100% { background-position: 0% center; }
+                50% { background-position: 100% center; }
+              }
+            `}</style>
+          </motion.div>
+          <motion.p
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.55, duration: 0.6 }}
+            style={{ color: C.t2, fontSize: 14, lineHeight: 1.75, maxWidth: 370, marginBottom: 28, letterSpacing: '0.01em' }}
+          >
+            Plateforme interne de gestion de projets, pipelines CI/CD et environnements de développement collaboratif — <span style={{ color: C.cyan, fontWeight: 600 }}>MTEFOP</span>.
+          </motion.p>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,maxWidth:380,marginBottom:32}}>
-            {[['Pipeline CI/CD','Automatise'],['Espace 4D','Immersif'],['3 Roles','Admin/Dev/Client'],['Deploy','Dev/Staging/Prod']].map(([title,sub])=>(
+            {[['Pipeline CI/CD','Automatise'],['Espace Dev','Collaboratif'],['3 Roles','Admin/Dev/Client'],['Deploiement','Dev/Staging/Prod']].map(([title,sub])=>(
               <div key={title} style={{background:'rgba(0,200,255,0.04)',border:`1px solid ${C.border}`,borderRadius:10,padding:'10px 12px'}}>
                 <p style={{fontSize:11,fontFamily:'Orbitron,sans-serif',fontWeight:700,color:C.t1}}>{title}</p>
                 <p style={{fontSize:10,color:C.t3}}>{sub}</p>
               </div>
             ))}
           </div>
-          <div style={{display:'flex',gap:28}}>
-            {[['2400+','Equipes'],['99.9%','Uptime'],['4D','Interface']].map(([v,l])=>(
-              <div key={l}>
-                <div style={{fontFamily:'Orbitron,sans-serif',fontWeight:900,fontSize:20,background:'linear-gradient(135deg,#00c8ff,#7c3aed)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text'}}>{v}</div>
-                <div style={{fontSize:11,color:C.t3}}>{l}</div>
-              </div>
-            ))}
-          </div>
         </div>
-        <p style={{fontSize:10,color:C.t3,fontFamily:'Orbitron,sans-serif'}}>2024 DevEnviron 4D</p>
+        <p style={{fontSize:10,color:C.t3,fontFamily:'Orbitron,sans-serif'}}>2026 MTEFOP · Plateforme de Developpement en Equipe</p>
       </motion.div>
 
-      {/* Panneau droit */}
+      {/* Panneau droit — formulaire */}
       <motion.div initial={{opacity:0,x:40}} animate={{opacity:1,x:0}} transition={{duration:0.8}}
         style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',padding:24,position:'relative',zIndex:10}}>
         <div style={{width:'100%',maxWidth:430}}>
@@ -129,15 +356,23 @@ export default function Login(){
                 borderRadius:i===0?'14px 0 0 0':i===1?'0 14px 0 0':i===2?'0 0 0 14px':'0 0 14px 0',...s}}/>
             ))}
 
-            <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:20}}>
-              <div style={{width:32,height:32,borderRadius:8,background:'linear-gradient(135deg,#00c8ff,#7c3aed)',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                <Zap size={15} style={{color:'#020408'}}/>
-              </div>
-              <span style={{fontFamily:'Orbitron,sans-serif',fontWeight:900,fontSize:12,background:'linear-gradient(135deg,#00c8ff,#fff)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text'}}>DEV ENVIRON 4D</span>
-            </div>
+            {/* Logo + Nom — panneau droit (card) */}
+            <AnimatedEnterpriseName />
 
-            <h2 style={{fontFamily:'Orbitron,sans-serif',fontWeight:900,fontSize:20,color:C.t1,marginBottom:4}}>CONNEXION</h2>
-            <p style={{fontSize:12,color:C.t3,marginBottom:18}}>Accedez a votre espace de developpement</p>
+            {/* Séparateur */}
+            <motion.div
+              initial={{ scaleX: 0 }}
+              animate={{ scaleX: 1 }}
+              transition={{ delay: 1.5, duration: 0.5 }}
+              style={{
+                height: 1,
+                background: 'linear-gradient(90deg, transparent, rgba(0,200,255,0.3), transparent)',
+                margin: '14px 0 18px',
+              }}
+            />
+
+            <h2 style={{fontFamily:'Orbitron,sans-serif',fontWeight:900,fontSize:18,color:C.t1,marginBottom:4,textAlign:'center'}}>CONNEXION</h2>
+            <p style={{fontSize:12,color:C.t3,marginBottom:18,textAlign:'center'}}>Accedez a votre espace de developpement</p>
 
             {/* Banner offline */}
             <AnimatePresence>
@@ -205,7 +440,7 @@ export default function Login(){
                 </div>
               </div>
 
-              {/* Role selector - display ihany, tsy ampitaina backend */}
+              {/* Role selector */}
               <div>
                 <label style={S.label}>Role de connexion</label>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:7,marginBottom:10}}>

@@ -1,81 +1,56 @@
 import React,{useState,useEffect,useRef,useCallback} from 'react'
 import {motion,AnimatePresence} from 'framer-motion'
 import {
-  Database,Server,Plus,Trash2,RefreshCw,Copy,Play,Square,
+  Database,Trash2,RefreshCw,Copy,Play,
   Terminal,FileCode,Package,Bug,TestTube,Gauge,Wrench,
-  CheckCircle,XCircle,BarChart3,
+  CheckCircle,XCircle,
 } from 'lucide-react'
 import {useApp} from '../context/AppContext.jsx'
 import {useAuth} from '../context/AuthContext.jsx'
-import {PanelHeader} from '../components/ui/UI.jsx'
 import {C,S} from '../styles.js'
 import {PT,useConfirm} from './shared/PageUtils.jsx'
+import DevTerminal   from '../components/devspace/Terminal.jsx'
+import DockerPanel   from '../components/devspace/DockerPanel.jsx'
+import DbQueryPanel  from '../components/devspace/DbQueryPanel.jsx'
+import ProfilerPanel from '../components/devspace/ProfilerPanel.jsx'
+import {devspaceApi}  from '../services/devspaceApi.js'
+
 
 // ════════════════════════════════════════════
-//  DEV SPACE — VERSION COMPLÈTE FONCTIONNELLE
+//  PISTON API — Execute code tena miasa
 // ════════════════════════════════════════════
+const PISTON_URL = 'https://emkc.org/api/v2/piston'
 
-// ── Commandes terminal avec réponses dynamiques ──────────
-function buildTCMDS(user){
-  return {
-    help: ()=>`Commandes disponibles :
-  Système  : help, clear, date, whoami, pwd, ls, ls -la, ls src, cat [fichier], echo [texte]
-  Git      : git status, git log, git branch, git diff, git pull
-  Node/npm : node --version, npm --version, npm install, npm start, npm run build, npm test
-  Docker   : docker ps, docker images, docker version, docker stats
-  Process  : ps, top, kill [pid]
-  Réseau   : ping [host], curl, ifconfig, netstat
-  PHP      : php -v, php artisan serve, php artisan migrate, php artisan list
-  DevEnv   : devenv status, devenv deploy, devenv logs, devenv health
-  Éditeur  : edit [fichier] — ouvre un fichier dans l'éditeur`,
+const PISTON_LANG_MAP = {
+  javascript: { language: 'javascript', version: '18.15.0' },
+  jsx:        { language: 'javascript', version: '18.15.0' },
+  python:     { language: 'python',     version: '3.10.0'  },
+  php:        { language: 'php',        version: '8.2.3'   },
+  bash:       { language: 'bash',       version: '5.2.0'   },
+}
 
-    date:    ()=>new Date().toLocaleString('fr-FR',{weekday:'long',year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'}),
-    whoami:  ()=>`${user?.name||'dev-user'} (${user?.role||'dev'}) — DevEnviron 4D`,
-    pwd:     ()=>'/home/dev-user/devenviron-project',
-    ls:      ()=>`total 48\ndrwxr-xr-x  src/           index.html     package.json\ndrwxr-xr-x  public/        vite.config.js README.md\ndrwxr-xr-x  node_modules/  .env           .gitignore\n-rw-r--r--  docker-compose.yml`,
-    'ls -la':()=>`total 96\ndrwxr-xr-x 2 dev dev 4096 ${new Date().toLocaleDateString('fr-FR')} src/\ndrwxr-xr-x 2 dev dev 4096 ${new Date().toLocaleDateString('fr-FR')} public/\ndrwxr-xr-x 80 dev dev 4096 ${new Date().toLocaleDateString('fr-FR')} node_modules/\n-rw-r--r-- 1 dev dev 845 index.html\n-rw-r--r-- 1 dev dev 512 package.json\n-rw-r--r-- 1 dev dev 128 .env`,
-    'ls src':()=>'App.jsx  main.jsx  data.js  styles.js\ncomponents/  context/  pages/  services/  hooks/',
-    ps:      ()=>`  PID TTY          TIME CMD\n  001 pts/0    00:00:01 bash\n 1234 pts/0    00:00:0${Math.floor(Math.random()*9)} node (vite dev)\n 5678 pts/0    00:00:00 php (artisan serve)\n 9012 pts/0    00:00:00 ps`,
-    top:     ()=>{
-      const cpu=Math.floor(Math.random()*30+10)
-      const mem=Math.floor(Math.random()*40+30)
-      return `Tasks: 4 total, 2 running\nCPU: ${cpu}%  Mem: ${mem}%  Uptime: ${Math.floor(Math.random()*24)}h${Math.floor(Math.random()*60)}m\n\n  PID  CPU  MEM COMMAND\n 1234  ${Math.floor(cpu*0.6)}%  ${Math.floor(mem*0.6)}% node (vite)\n 5678  ${Math.floor(cpu*0.3)}%  ${Math.floor(mem*0.3)}% php (artisan)\n    1   0%   5% bash`
-    },
-    ifconfig:()=>'eth0: flags=4163<UP,BROADCAST,RUNNING>\n  inet 127.0.0.1  netmask 255.0.0.0\n  inet6 ::1  prefixlen 128\nlo: flags=73<UP,LOOPBACK,RUNNING>\n  inet 127.0.0.1  netmask 255.0.0.0',
-    netstat: ()=>'Active Internet connections\nProto Recv-Q Send-Q Local Address  Foreign Address  State\ntcp   0      0      0.0.0.0:5173   0.0.0.0:*        LISTEN\ntcp   0      0      0.0.0.0:8000   0.0.0.0:*        LISTEN\ntcp   0      0      0.0.0.0:5432   0.0.0.0:*        LISTEN',
-    curl:    ()=>`{"status":"ok","app":"DevEnviron 4D","version":"1.0.0","timestamp":"${new Date().toISOString()}","user":"${user?.name||'dev'}"}`,
-    'git status': ()=>`On branch main\nYour branch is up to date with 'origin/main'.\n\nChanges not staged for commit:\n  modified:   src/pages/OtherPages.jsx\n  modified:   src/context/AppContext.jsx\n\nUntracked files:\n  src/hooks/useDevSpace.js\n\nno changes added to commit (use "git add")`,
-    'git log':    ()=>`commit a1b2c3d4e5f6 (HEAD -> main, origin/main)\nAuthor: ${user?.name||'Dev User'} <${user?.email||'dev@devenviron.com'}>\nDate:   ${new Date().toDateString()}\n\n    feat: DevSpace fully functional — all tools working\n\ncommit b2c3d4e5f6a7\nAuthor: Marie Dubois <marie@devenviron.com>\nDate:   ${new Date(Date.now()-86400000).toDateString()}\n\n    fix: correct CORS headers for API\n\ncommit c3d4e5f6a7b8\nAuthor: Jean Martin <jean@devenviron.com>\nDate:   ${new Date(Date.now()-172800000).toDateString()}\n\n    feat: add pipeline CI/CD stages`,
-    'git branch': ()=>'* main\n  feat/devspace-editor\n  feat/real-time-chat\n  fix/pipeline-logs\n  hotfix/auth-jwt',
-    'git diff':   ()=>'diff --git a/src/pages/OtherPages.jsx b/src/pages/OtherPages.jsx\nindex a1b2c3d..d4e5f6a 100644\n--- a/src/pages/OtherPages.jsx\n+++ b/src/pages/OtherPages.jsx\n@@ -163,7 +163,12 @@ export function Environments(){\n-    await new Promise(r=>setTimeout(r,2500))\n+    // Déploiement réel avec logs progressifs\n+    for(const step of deploySteps){\n+      await showDeployLog(step)\n+    }',
-    'git pull':   ()=>`remote: Enumerating objects: 5, done.\nremote: Counting objects: 100% (5/5), done.\nremote: Compressing objects: 100% (3/3), done.\nUnpacking objects: 100% (3/3), done.\nFrom https://github.com/devenviron/platform\n   a1b2c3d..d4e5f6a  main -> origin/main\nUpdating a1b2c3d..d4e5f6a\nFast-forward\n src/pages/OtherPages.jsx | 4 +++-\n 1 file changed, 3 insertions(+), 1 deletion(-)`,
-    'node --version':    ()=>'v20.11.0 LTS',
-    'npm --version':     ()=>'10.2.4',
-    'npm install':       ()=>`\nnpm warn deprecated old-package@1.0.0\nadded 246 packages in ${(2+Math.random()*3).toFixed(3)}s\n\n86 packages are looking for funding\nfound 0 vulnerabilities ✓`,
-    'npm start':         ()=>`> devenviron4d@1.0.0 start\n> vite\n\n  VITE v5.4.2  ready in ${(300+Math.floor(Math.random()*200))} ms\n  ➜  Local:   http://localhost:5173/\n  ➜  Network: http://192.168.1.100:5173/`,
-    'npm run build':     ()=>`> devenviron4d@1.0.0 build\n> vite build\n\n✓ 42 modules transformed.\ndist/index.html                  1.22 kB\ndist/assets/index-DiwrgTda.css   5.20 kB\ndist/assets/index-BvPkz9aV.js  312.48 kB\n✓ built in ${(1.5+Math.random()*2).toFixed(2)}s`,
-    'npm test':          ()=>`> devenviron4d@1.0.0 test\n> vitest\n\n✓ src/tests/auth.test.js    (12 tests) ${(200+Math.floor(Math.random()*100))}ms\n✓ src/tests/api.test.js     (8 tests)  ${(150+Math.floor(Math.random()*80))}ms\n✓ src/tests/ui.test.js      (24 tests) ${(300+Math.floor(Math.random()*150))}ms\n\nTest Files  3 passed (3)\nTests       44 passed (44)\nDuration    ${(0.8+Math.random()*0.8).toFixed(2)}s`,
-    'docker ps':         ()=>`CONTAINER ID   IMAGE            COMMAND                STATUS          PORTS\nabc123def456   node:20-alpine   "docker-entrypoint"  Up ${Math.floor(Math.random()*12)+1}h   3000->3000/tcp\ndef456abc123   nginx:1.25       "/docker-entrypoint"  Up ${Math.floor(Math.random()*5)+1}h   80->80/tcp\nghi789jkl012   postgres:16      "docker-entrypoint"   Up ${Math.floor(Math.random()*24)+1}h  5432->5432/tcp`,
-    'docker images':     ()=>'REPOSITORY   TAG        IMAGE ID       CREATED        SIZE\nnode         20-alpine  a1b2c3d4e5f6   2 days ago     126MB\nnginx        1.25       b2c3d4e5f6a7   1 week ago     142MB\npostgres     16         c3d4e5f6a7b8   2 weeks ago    379MB',
-    'docker version':    ()=>'Client: Docker Engine - Community\n Version: 24.0.7\nServer: Docker Engine - Community\n Engine Version: 24.0.7\n containerd Version: 1.6.26',
-    'docker stats':      ()=>{
-      const cpu1=Math.floor(Math.random()*20+5)
-      const cpu2=Math.floor(Math.random()*15+3)
-      const cpu3=Math.floor(Math.random()*10+2)
-      return `CONTAINER ID   NAME         CPU %   MEM USAGE/LIMIT     MEM %\nabc123def456   devenviron   ${cpu1}.${Math.floor(Math.random()*9)}%    ${Math.floor(Math.random()*200+200)}MiB/2GiB   ${Math.floor((cpu1/2+10))}%\ndef456abc123   nginx        ${cpu2}.${Math.floor(Math.random()*9)}%    ${Math.floor(Math.random()*50+20)}MiB/512MiB  ${Math.floor(cpu2)}%\nghi789jkl012   postgres     ${cpu3}.${Math.floor(Math.random()*9)}%    ${Math.floor(Math.random()*100+80)}MiB/1GiB    ${Math.floor(cpu3+5)}%`
-    },
-    'php -v':            ()=>'PHP 8.2.12 (cli) (built: Oct 24 2023)\nCopyright (c) The PHP Group\nZend Engine v4.2.12, Copyright (c) Zend Technologies',
-    'php artisan serve': ()=>'Starting Laravel development server: http://127.0.0.1:8000\n[INFO] Server running on [http://127.0.0.1:8000]\n[INFO] Press Ctrl+C to stop the server',
-    'php artisan migrate':()=>`INFO  Running migrations.\n  ${new Date().toISOString().split('T')[0].replace(/-/g,'_')}_create_users_table .......... ${Math.floor(Math.random()*15+5)}ms DONE\n  ${new Date().toISOString().split('T')[0].replace(/-/g,'_')}_create_projects_table ....... ${Math.floor(Math.random()*12+4)}ms DONE\n  ${new Date().toISOString().split('T')[0].replace(/-/g,'_')}_create_tasks_table .......... ${Math.floor(Math.random()*10+3)}ms DONE`,
-    'php artisan list':  ()=>'Laravel Framework 11.0.0\n\nUsage:\n  command [options] [arguments]\n\nAvailable commands:\n  migrate          Run the database migrations\n  serve            Serve the application\n  tinker           Interact with your application\n  route:list       List all registered routes\n  cache:clear      Flush the application cache\n  config:clear     Remove the configuration cache\n  key:generate     Set the application key',
-    'devenv status':     ()=>`DevEnviron 4D — Status Report [${new Date().toLocaleTimeString('fr-FR')}]\n  Frontend   : ✓ Running (http://localhost:5173)\n  Backend    : ✓ Running (http://localhost:8000)\n  Database   : ✓ Connected (PostgreSQL 16)\n  JWT Auth   : ✓ Active\n  Pipeline   : ○ Idle\n  Uptime     : ${Math.floor(Math.random()*24+1)}h ${Math.floor(Math.random()*60)}m\n  Memory     : ${Math.floor(Math.random()*30+40)}% used`,
-    'devenv deploy':     ()=>`[${new Date().toLocaleTimeString('fr-FR')}] Déploiement DevEnviron 4D...\n  ✓ Tests passed (44/44) — ${(0.8+Math.random()).toFixed(2)}s\n  ✓ Build complete — ${(1.5+Math.random()*2).toFixed(2)}s\n  ✓ Docker image built & pushed\n  ✓ Migration PostgreSQL OK\n  ✓ Déploiement réussi → https://app.devenviron.io\n  Durée totale : ${(5+Math.random()*10).toFixed(1)}s`,
-    'devenv logs':       ()=>`[${new Date().toLocaleTimeString('fr-FR')}] INFO  Server started\n[${new Date().toLocaleTimeString('fr-FR')}] INFO  User login: ${user?.email||'admin@devenviron.com'}\n[${new Date().toLocaleTimeString('fr-FR')}] INFO  GET /api/projects → 200 (${Math.floor(Math.random()*20+5)}ms)\n[${new Date().toLocaleTimeString('fr-FR')}] INFO  POST /api/tasks → 201 (${Math.floor(Math.random()*15+3)}ms)\n[${new Date().toLocaleTimeString('fr-FR')}] INFO  Pipeline triggered by ${user?.name||'admin'}`,
-    'devenv health':     ()=>{
-      const score=Math.floor(Math.random()*15+85)
-      return `Health Score: ${score}/100 ${score>=90?'🟢 EXCELLENT':score>=75?'🟡 BON':'🔴 ATTENTION'}\n  CPU:      ${Math.floor(Math.random()*30+10)}%   ✓\n  Mémoire:  ${Math.floor(Math.random()*40+30)}%   ✓\n  Disque:   ${Math.floor(Math.random()*20+15)}%   ✓\n  Réseau:   ${Math.floor(Math.random()*5+1)}ms    ✓\n  DB:       ${Math.floor(Math.random()*10+2)}ms    ✓`
-    },
-    kill:  ()=>'bash: kill: requires PID argument\nUsage: kill [PID]',
+async function executeCode(lang, code) {
+  const langCfg = PISTON_LANG_MAP[lang]
+  if (!langCfg) return { stdout: '', stderr: `Langage "${lang}" non supporté pour l'exécution.`, code: 1 }
+  try {
+    const res = await fetch(`${PISTON_URL}/execute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        language: langCfg.language,
+        version:  langCfg.version,
+        files: [{ name: 'main', content: code }],
+      }),
+    })
+    if (!res.ok) throw new Error(`Piston API error: ${res.status}`)
+    const data = await res.json()
+    return {
+      stdout: data.run?.stdout || '',
+      stderr: data.run?.stderr || '',
+      code:   data.run?.code   ?? 0,
+    }
+  } catch(e) {
+    return { stdout: '', stderr: 'Erreur Piston API: ' + e.message, code: 1 }
   }
 }
 
@@ -291,26 +266,6 @@ export const api = {
 }
 
 // ── Données pour les outils DevSpace ─────────────────────
-const MOCK_DOCKER_CONTAINERS=[
-  {id:'abc123',name:'devenviron-frontend',image:'node:20-alpine',status:'running',cpu:12.4,mem:45.2,ports:'5173:5173',uptime:'3h 24m'},
-  {id:'def456',name:'devenviron-backend', image:'php:8.2-fpm',  status:'running',cpu:8.1, mem:28.7,ports:'8000:8000',uptime:'3h 24m'},
-  {id:'ghi789',name:'devenviron-db',      image:'postgres:16',  status:'running',cpu:3.2, mem:62.1,ports:'5432:5432',uptime:'5h 12m'},
-  {id:'jkl012',name:'devenviron-nginx',   image:'nginx:1.25',   status:'stopped',cpu:0,   mem:0,   ports:'80:80',   uptime:'—'},
-]
-const MOCK_DB_TABLES=[
-  {name:'users',    rows:24, size:'48 kB', lastUpdate:'il y a 2h'},
-  {name:'projects', rows:8,  size:'24 kB', lastUpdate:'il y a 30min'},
-  {name:'tasks',    rows:47, size:'96 kB', lastUpdate:'il y a 5min'},
-  {name:'messages', rows:132,size:'188 kB',lastUpdate:'il y a 1min'},
-  {name:'repos',    rows:6,  size:'16 kB', lastUpdate:'il y a 1h'},
-  {name:'environments',rows:3,size:'8 kB', lastUpdate:'il y a 3h'},
-]
-const MOCK_TESTS=[
-  {file:'auth.test.js',   tests:12,passed:12,failed:0, duration:'243ms',status:'pass'},
-  {file:'api.test.js',    tests:8, passed:8, failed:0, duration:'187ms',status:'pass'},
-  {file:'ui.test.js',     tests:24,passed:23,failed:1, duration:'412ms',status:'fail'},
-  {file:'pipeline.test.js',tests:6,passed:6,failed:0, duration:'156ms',status:'pass'},
-]
 
 export function DevSpace(){
   const {user}=useAuth()
@@ -319,87 +274,6 @@ export function DevSpace(){
   const {confirm,Dialog:ConfirmDialog}=useConfirm()
   // Tab actif
   const [activeTab,setActiveTab]=useState('terminal')
-
-  // ══════════════════════════════════════════
-  //  TERMINAL
-  // ══════════════════════════════════════════
-  const TCMDS=buildTCMDS(user)
-  const [lines,setLines]=useState([
-    {t:`DevEnviron Terminal v2.0.0 — Connecté en tant que ${user?.name||'dev-user'}`,c:'#00c8ff'},
-    {t:`[${new Date().toLocaleTimeString('fr-FR')}] Environnement prêt. Tapez "help" pour voir les commandes.`,c:'#00ff88'},
-    {t:'',c:'#fff'},
-  ])
-  const [termInput,setTermInput]=useState('')
-  const [hist,setHist]         =useState([])
-  const [hi,setHi]             =useState(-1)
-  const termRef                =useRef(null)
-  const termInputRef           =useRef(null)
-
-  useEffect(()=>{ termRef.current?.scrollTo(0,termRef.current.scrollHeight) },[lines])
-
-  const addLine=(t,c='#00ff88')=>setLines(l=>[...l,{t,c}])
-
-  const run=useCallback(cmd=>{
-    const s=cmd.trim(); if(!s) return
-    addLine(`dev@devenviron:~$ ${s}`,'#00c8ff')
-    setHist(h=>[s,...h.filter(x=>x!==s).slice(0,49)])
-    setHi(-1)
-
-    if(s==='clear'){ setLines([]); return }
-    if(s.startsWith('echo ')){ addLine(s.slice(5)); return }
-    if(s.startsWith('ping ')){
-      const host=s.slice(5)||'localhost'
-      addLine(`PING ${host} (127.0.0.1)\n64 bytes from 127.0.0.1: icmp_seq=1 time=${(0.02+Math.random()*0.08).toFixed(3)}ms\n64 bytes from 127.0.0.1: icmp_seq=2 time=${(0.02+Math.random()*0.08).toFixed(3)}ms\n--- ${host} ping statistics ---\n2 packets transmitted, 2 received, 0% packet loss`)
-      return
-    }
-    if(s.startsWith('cat ')){
-      const fname=s.slice(4).trim()
-      const fileContents={
-        '.env':'APP_NAME="DevEnviron 4D"\nAPP_ENV=local\nAPP_KEY=base64:xxx\nDB_CONNECTION=pgsql\nDB_HOST=127.0.0.1\nDB_PORT=5432\nDB_DATABASE=devenviron',
-        'package.json':'{\n  "name": "devenviron4d",\n  "version": "1.0.0",\n  "scripts": {\n    "dev": "vite",\n    "build": "vite build",\n    "test": "vitest"\n  }\n}',
-        'README.md':'# DevEnviron 4D\n\nPlateforme de développement collaboratif.\n\n## Installation\n1. npm install\n2. npm run dev\n\n## Stack\n- React 18 + Vite\n- Laravel 11\n- PostgreSQL 16',
-      }
-      addLine(fileContents[fname]||`cat: ${fname}: No such file or directory`,'#ffce00')
-      return
-    }
-    if(s.startsWith('kill ')){
-      const pid=s.split(' ')[1]
-      if(!/^\d+$/.test(pid)){ addLine(`kill: ${pid}: invalid PID`,'#ff2d78'); return }
-      addLine(`[${pid}] Terminated`,'#ff2d78')
-      return
-    }
-    if(s.startsWith('edit ')){
-      const fname=s.slice(5).trim()
-      setActiveTab('editor')
-      addLine(`Ouverture de ${fname} dans l'éditeur...`,'#00c8ff')
-      return
-    }
-    const fn=TCMDS[s.toLowerCase()]
-    if(fn) addLine(fn())
-    else   addLine(`bash: ${s}: commande introuvable. Tapez 'help' pour la liste.`,'#ff2d78')
-  },[TCMDS])
-
-  const onTermKey=e=>{
-    if(e.key==='Enter'){ run(termInput); setTermInput('') }
-    else if(e.key==='ArrowUp'){
-      e.preventDefault()
-      const i=Math.min(hi+1,hist.length-1); setHi(i); setTermInput(hist[i]||'')
-    }
-    else if(e.key==='ArrowDown'){
-      e.preventDefault()
-      const i=Math.max(hi-1,-1); setHi(i); setTermInput(i===-1?'':hist[i])
-    }
-    else if(e.key==='Tab'){
-      e.preventDefault()
-      const all=[...Object.keys(TCMDS),'clear','echo','ping','cat','kill','edit']
-      const matches=all.filter(c=>c.startsWith(termInput))
-      if(matches.length===1) setTermInput(matches[0])
-      else if(matches.length>1) addLine(matches.join('  '),'#ffce00')
-    }
-    else if(e.key==='l'&&e.ctrlKey){
-      e.preventDefault(); setLines([])
-    }
-  }
 
   // ══════════════════════════════════════════
   //  ÉDITEUR
@@ -414,6 +288,9 @@ export function DevSpace(){
   const [isSaving,setIsSaving]            =useState(false)
   const [activeSnippet,setActiveSnippet]  =useState('React Component')
   const [unsaved,setUnsaved]              =useState(false)
+  const [running,setRunning]               =useState(false)
+  const [runOutput,setRunOutput]           =useState(null)
+  const [showOutput,setShowOutput]         =useState(false)
   const [findText,setFindText]            =useState('')
   const [showFind,setShowFind]            =useState(false)
   const editorRef                         =useRef(null)
@@ -466,6 +343,28 @@ export function DevSpace(){
     setTimeout(()=>setSavedMsg(''),2000)
   }
 
+
+  const handleRun=useCallback(async()=>{
+    if(!editorCode.trim()){ showToast('Écrivez du code à exécuter !','warning'); return }
+    if(!PISTON_LANG_MAP[editorLang]){
+      showToast(`Exécution non disponible pour ${editorLang}. Utilisez JS, Python, PHP ou Bash.`,'warning')
+      return
+    }
+    setRunning(true)
+    setShowOutput(true)
+    setRunOutput({stdout:'⏳ Exécution en cours via Piston API...',stderr:'',code:null})
+    try{
+      const result=await executeCode(editorLang, editorCode)
+      setRunOutput(result)
+      if(result.code===0) showToast('✓ Exécution réussie !','success')
+      else showToast('✗ Erreur lors de l\'exécution','danger')
+    }catch(e){
+      setRunOutput({stdout:'',stderr:e.message,code:1})
+    }finally{
+      setRunning(false)
+    }
+  },[editorCode,editorLang,showToast])
+
   const loadSnippet=useCallback(async name=>{
     if(unsaved){
       const ok=await confirm('Des modifications non sauvegardées seront perdues. Continuer ?')
@@ -491,6 +390,7 @@ export function DevSpace(){
       requestAnimationFrame(()=>{ el.selectionStart=el.selectionEnd=s+2 })
     }
     if((e.ctrlKey||e.metaKey)&&e.key==='s'){ e.preventDefault(); handleSave() }
+    if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){ e.preventDefault(); handleRun() }
     if((e.ctrlKey||e.metaKey)&&e.shiftKey&&e.key==='F'){ e.preventDefault(); handleFormat() }
     if((e.ctrlKey||e.metaKey)&&e.key==='f'){ e.preventDefault(); setShowFind(v=>!v) }
     // Auto-fermer les parenthèses/crochets/guillemets
@@ -518,80 +418,6 @@ export function DevSpace(){
   const findCount=findText
     ?editorCode.split(findText.toLowerCase()).length-1
     :0
-
-  // ══════════════════════════════════════════
-  //  DOCKER
-  // ══════════════════════════════════════════
-  const [containers,setContainers]=useState(MOCK_DOCKER_CONTAINERS)
-  const [dockerBusy,setDockerBusy]=useState(false)
-
-  const toggleContainer=async(id,currentStatus)=>{
-    setDockerBusy(id)
-    await new Promise(r=>setTimeout(r,800))
-    setContainers(cs=>cs.map(c=>c.id===id
-      ?{...c,status:currentStatus==='running'?'stopped':'running',
-        cpu:currentStatus==='running'?0:Math.floor(Math.random()*20+5),
-        mem:currentStatus==='running'?0:Math.floor(Math.random()*50+20)}
-      :c))
-    showToast(`Container ${currentStatus==='running'?'arrêté':'démarré'} !`,'success')
-    setDockerBusy(null)
-  }
-
-  const restartContainer=async id=>{
-    setDockerBusy(id)
-    await new Promise(r=>setTimeout(r,1000))
-    setContainers(cs=>cs.map(c=>c.id===id
-      ?{...c,status:'running',cpu:Math.floor(Math.random()*15+5),mem:Math.floor(Math.random()*40+20),uptime:'0s'}
-      :c))
-    showToast('Container redémarré !','success')
-    setDockerBusy(null)
-  }
-
-  // ══════════════════════════════════════════
-  //  BASE DE DONNÉES
-  // ══════════════════════════════════════════
-  const [dbTables,setDbTables]   =useState(MOCK_DB_TABLES)
-  const [dbQuery,setDbQuery]     =useState('SELECT * FROM users LIMIT 10;')
-  const [dbResult,setDbResult]   =useState(null)
-  const [dbRunning,setDbRunning] =useState(false)
-  const [dbActiveTable,setDbActiveTable]=useState(null)
-
-  const runQuery=async()=>{
-    if(!dbQuery.trim()) return
-    setDbRunning(true)
-    setDbResult(null)
-    await new Promise(r=>setTimeout(r,400+Math.random()*300))
-    const q=dbQuery.toLowerCase().trim()
-    let result
-    if(q.startsWith('select')){
-      const match=q.match(/from\s+(\w+)/i)
-      const tbl=match?.[1]||'unknown'
-      const known=['users','projects','tasks','messages','repos','environments']
-      if(known.includes(tbl)){
-        result={
-          type:'select',
-          columns:tbl==='users'?['id','name','email','role','created_at']:
-                  tbl==='tasks'?['id','title','status','priority','assignee']:
-                  tbl==='projects'?['id','name','status','progress','created_by']:
-                  ['id','name','created_at'],
-          rows:Array.from({length:Math.floor(Math.random()*5+2)},(_,i)=>({id:i+1,name:`Enregistrement ${i+1}`,...tbl==='users'?{email:`user${i+1}@test.com`,role:['admin','dev','client'][i%3],created_at:new Date(Date.now()-i*86400000).toLocaleDateString()}:{}})),
-          duration:`${Math.floor(Math.random()*15+2)}ms`,
-          count:Math.floor(Math.random()*20+5),
-        }
-      }else{
-        result={type:'error',message:`ERROR: relation "${tbl}" does not exist`}
-      }
-    }else if(q.startsWith('insert')||q.startsWith('update')||q.startsWith('delete')){
-      const affected=Math.floor(Math.random()*5+1)
-      result={type:'dml',message:`${q.startsWith('insert')?'INSERT':'UPDATE'} ${affected}`,duration:`${Math.floor(Math.random()*10+1)}ms`}
-    }else if(q.includes('create table')){
-      result={type:'dml',message:'CREATE TABLE',duration:'8ms'}
-    }else{
-      result={type:'error',message:'ERREUR: syntaxe SQL non reconnue'}
-    }
-    setDbResult(result)
-    setDbRunning(false)
-  }
 
   // ══════════════════════════════════════════
   //  DEBUGGER
@@ -628,65 +454,77 @@ export function DevSpace(){
   }
 
   // ══════════════════════════════════════════
-  //  TESTS
+  //  TESTS — vendor/bin/phpunit tena miasa (tsy Math.random() intsony)
   // ══════════════════════════════════════════
-  const [tests,setTests]         =useState(MOCK_TESTS)
-  const [testRunning,setTestRunning]=useState(false)
+  const [tests,setTests]             =useState([])
+  const [testsLoading,setTestsLoading]=useState(true)
+  const [testRunning,setTestRunning] =useState(false)
   const [testProgress,setTestProgress]=useState(0)
   const [testSelected,setTestSelected]=useState(null)
+  const [testLastRaw,setTestLastRaw]  =useState('')
 
-  const runTests=async(specific=null)=>{
-    setTestRunning(true)
-    setTestProgress(0)
-    const toRun=specific?tests.filter(t=>t.file===specific):tests
-    for(let i=0;i<toRun.length;i++){
-      setTestProgress(Math.round((i+1)/toRun.length*100))
-      await new Promise(r=>setTimeout(r,300+Math.random()*400))
-      setTests(prev=>prev.map(t=>t.file===toRun[i].file
-        ?{...t,duration:`${Math.floor(Math.random()*200+100)}ms`,
-          status:Math.random()>0.15?'pass':'fail',
-          failed:Math.random()>0.15?0:1}
-        :t))
+  const loadTestSuites=useCallback(async()=>{
+    setTestsLoading(true)
+    try{
+      const res=await devspaceApi.testsList()
+      if(res?.success===false){
+        showToast(res.message||'Impossible de charger la liste des tests','danger')
+        setTests([])
+        return
+      }
+      setTests((res.data||[]).map(s=>({
+        file:s.file, class:s.class, group:s.group,
+        tests:s.testCount, passed:0, failed:0,
+        duration:'—', status:'idle', cases:[],
+      })))
+    }catch(err){
+      showToast('Erreur serveur — liste des tests indisponible','danger')
+      setTests([])
+    }finally{
+      setTestsLoading(false)
     }
-    setTestRunning(false)
-    showToast('Tests terminés !','success')
+  },[showToast])
+
+  useEffect(()=>{ loadTestSuites() },[loadTestSuites])
+
+  const runTests=async(specificFile=null)=>{
+    const target=specificFile?tests.find(t=>t.file===specificFile):null
+    if(specificFile && !target) return
+
+    setTestRunning(true)
+    setTestProgress(35)
+    try{
+      const res=await devspaceApi.testsRun(target?target.class:null)
+      setTestProgress(85)
+      if(res?.success===false){
+        showToast(res.message||'Échec de l\'exécution des tests','danger')
+        setTestLastRaw(res?.errors?.raw||'')
+        return
+      }
+      const suites=res?.data?.suites||[]
+      setTestLastRaw(res?.data?.raw||'')
+      setTests(prev=>prev.map(t=>{
+        const match=suites.find(s=>s.class===t.class)
+        return match
+          ?{...t,tests:match.tests,passed:match.passed,failed:match.failed,
+            duration:match.duration,status:match.status,cases:match.cases}
+          :t
+      }))
+      const totalFail=suites.reduce((a,s)=>a+s.failed,0)
+      showToast(totalFail>0?`Tests terminés — ${totalFail} échec(s)`:'Tests terminés — tout est vert ! 🎉',
+        totalFail>0?'danger':'success')
+    }catch(err){
+      showToast('Erreur serveur — impossible de lancer les tests','danger')
+    }finally{
+      setTestProgress(100)
+      setTestRunning(false)
+      setTimeout(()=>setTestProgress(0),600)
+    }
   }
 
   const totalTests=tests.reduce((a,t)=>a+t.tests,0)
   const totalPassed=tests.reduce((a,t)=>a+t.passed,0)
   const totalFailed=tests.reduce((a,t)=>a+t.failed,0)
-
-  // ══════════════════════════════════════════
-  //  PROFILER
-  // ══════════════════════════════════════════
-  const [perfData,setPerfData]=useState({
-    lcp:1240,fid:12,cls:0.04,ttfb:180,fcp:890,tti:2100,
-    memory:{used:45.2,total:128,heap:38.7},
-    api:[
-      {endpoint:'/api/projects',  avg:18,min:8, max:45, calls:124},
-      {endpoint:'/api/tasks',     avg:12,min:5, max:32, calls:89},
-      {endpoint:'/api/auth/me',   avg:6, min:3, max:18, calls:312},
-      {endpoint:'/api/users',     avg:24,min:12,max:67, calls:43},
-    ]
-  })
-  const [perfRefreshing,setPerfRefreshing]=useState(false)
-
-  const refreshPerf=async()=>{
-    setPerfRefreshing(true)
-    await new Promise(r=>setTimeout(r,600))
-    setPerfData(p=>({
-      lcp:Math.floor(800+Math.random()*1200),
-      fid:Math.floor(5+Math.random()*30),
-      cls:parseFloat((Math.random()*0.15).toFixed(3)),
-      ttfb:Math.floor(80+Math.random()*300),
-      fcp:Math.floor(400+Math.random()*800),
-      tti:Math.floor(1000+Math.random()*3000),
-      memory:{used:parseFloat((30+Math.random()*40).toFixed(1)),total:128,heap:parseFloat((25+Math.random()*35).toFixed(1))},
-      api:p.api.map(a=>({...a,avg:Math.floor(a.avg*0.8+Math.random()*a.avg*0.4),calls:a.calls+Math.floor(Math.random()*10)}))
-    }))
-    setPerfRefreshing(false)
-    showToast('Métriques actualisées','success')
-  }
 
   // ══════════════════════════════════════════
   //  CONFIG
@@ -768,59 +606,9 @@ export function DevSpace(){
       <AnimatePresence mode="wait">
 
         {/* ══════════════════════════════════════════
-            TERMINAL
+            TERMINAL (réel — whitelist de commandes)
         ══════════════════════════════════════════ */}
-        {activeTab==='terminal'&&(
-          <motion.div key="terminal" initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0}}>
-            <div style={{background:'#000',border:'1px solid rgba(0,255,136,0.2)',borderRadius:12,overflow:'hidden',boxShadow:'0 0 30px rgba(0,255,136,0.05)'}}>
-              {/* Barre titre */}
-              <div style={{display:'flex',alignItems:'center',gap:7,padding:'10px 14px',borderBottom:'1px solid rgba(0,255,136,0.1)',background:'#080808'}}>
-                <div style={{width:12,height:12,borderRadius:'50%',background:'#ff5f57',cursor:'pointer'}} onClick={()=>setLines([])}/>
-                <div style={{width:12,height:12,borderRadius:'50%',background:'#ffbd2e'}}/>
-                <div style={{width:12,height:12,borderRadius:'50%',background:'#28c840'}}/>
-                <span style={{flex:1,textAlign:'center',fontSize:11,color:'#555',fontFamily:'JetBrains Mono,monospace'}}>
-                  terminal — {user?.name||'dev-user'}@devenviron — bash
-                </span>
-                <span style={{fontSize:10,color:'#555',fontFamily:'JetBrains Mono,monospace'}}>{hist.length} cmds</span>
-                <button onClick={()=>setLines([])}
-                  style={{background:'none',border:'none',color:'#555',cursor:'pointer',fontSize:10,fontFamily:'Orbitron,sans-serif',letterSpacing:'0.05em'}}>
-                  ✕ CLEAR
-                </button>
-              </div>
-              {/* Logs */}
-              <div ref={termRef} onClick={()=>termInputRef.current?.focus()}
-                style={{padding:14,fontFamily:'JetBrains Mono,monospace',fontSize:13,lineHeight:1.75,minHeight:300,maxHeight:440,overflowY:'auto',cursor:'text'}}>
-                {lines.map((l,i)=>(
-                  <div key={i} style={{color:l.c,whiteSpace:'pre-wrap',wordBreak:'break-all'}}>{l.t}</div>
-                ))}
-              </div>
-              {/* Ligne saisie */}
-              <div style={{display:'flex',alignItems:'center',gap:9,padding:'10px 14px',borderTop:'1px solid rgba(0,255,136,0.1)',background:'#040404'}}>
-                <span style={{color:'#00ff88',fontFamily:'JetBrains Mono,monospace',fontSize:13,flexShrink:0,userSelect:'none'}}>
-                  {user?.name||'dev'}@devenviron:~$
-                </span>
-                <input ref={termInputRef} value={termInput}
-                  onChange={e=>setTermInput(e.target.value)}
-                  onKeyDown={onTermKey}
-                  style={{flex:1,background:'transparent',border:'none',color:'#00ff88',fontFamily:'JetBrains Mono,monospace',fontSize:13,outline:'none',caretColor:'#00ff88'}}
-                  placeholder="Tapez une commande... (Tab=complétion, ↑↓=historique, Ctrl+L=effacer)"
-                  autoFocus/>
-              </div>
-            </div>
-            {/* Raccourcis */}
-            <div style={{display:'flex',gap:7,flexWrap:'wrap',marginTop:10}}>
-              {['help','ls','git status','devenv status','devenv health','docker ps','npm test','top'].map(cmd=>(
-                <button key={cmd} onClick={()=>{ run(cmd); termInputRef.current?.focus() }}
-                  style={{padding:'4px 10px',borderRadius:6,fontSize:10,fontFamily:'JetBrains Mono,monospace',
-                    background:'rgba(0,200,255,0.06)',border:'1px solid rgba(0,200,255,0.18)',color:C.t2,cursor:'pointer',transition:'all 0.15s'}}
-                  onMouseEnter={e=>{e.currentTarget.style.background='rgba(0,200,255,0.12)';e.currentTarget.style.color=C.cyan}}
-                  onMouseLeave={e=>{e.currentTarget.style.background='rgba(0,200,255,0.06)';e.currentTarget.style.color=C.t2}}>
-                  {cmd}
-                </button>
-              ))}
-            </div>
-          </motion.div>
-        )}
+        {activeTab==='terminal' && <DevTerminal key="terminal"/>}
 
         {/* ══════════════════════════════════════════
             ÉDITEUR
@@ -897,6 +685,15 @@ export function DevSpace(){
                   <button onClick={handleFormat} style={{...S.btnGhost,padding:'4px 10px',fontSize:10,height:26}}>
                     Formater
                   </button>
+                  <button onClick={handleRun} disabled={running}
+                    style={{padding:'4px 14px',borderRadius:6,fontSize:10,fontFamily:'Orbitron,sans-serif',fontWeight:700,
+                      background:running?'rgba(0,200,255,0.2)':C.neon,color:running?C.neon:'#020408',border:'none',
+                      cursor:running?'not-allowed':'pointer',height:26,display:'flex',alignItems:'center',gap:5,marginRight:4}}>
+                    {running
+                      ?<><motion.span animate={{rotate:360}} transition={{repeat:Infinity,duration:0.6,ease:'linear'}}
+                          style={{display:'inline-block',width:10,height:10,borderRadius:'50%',border:'2px solid currentColor',borderTopColor:'transparent'}}/> Running...</>
+                      :<><Play size={10}/> Run (Ctrl+Enter)</>}
+                  </button>
                   <button onClick={handleSave} disabled={isSaving}
                     style={{padding:'4px 12px',borderRadius:6,fontSize:10,fontFamily:'Orbitron,sans-serif',fontWeight:700,
                       background:isSaving?'rgba(0,200,255,0.3)':C.cyan,color:'#020408',border:'none',cursor:isSaving?'not-allowed':'pointer',height:26,
@@ -952,6 +749,43 @@ export function DevSpace(){
               </div>
             </div>
 
+
+            {/* OUTPUT PISTON */}
+            {showOutput&&(
+              <motion.div initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{duration:0.3}}
+                style={{marginTop:10,borderRadius:12,overflow:'hidden',
+                  border:`1px solid ${runOutput?.code===0?'rgba(0,255,136,0.3)':'rgba(255,45,120,0.3)'}`,
+                  background:'#000'}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 14px',
+                  background:'#080808',borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
+                  <span style={{fontFamily:'Orbitron,sans-serif',fontWeight:700,fontSize:11,
+                    color:running?'#ffce00':runOutput?.code===0?'#00ff88':'#ff2d78'}}>
+                    {running?'⏳ EXÉCUTION EN COURS...':runOutput?.code===0?'✓ SUCCÈS':'✗ ERREUR'}
+                  </span>
+                  <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                    {!running&&runOutput?.code!==null&&(
+                      <span style={{fontSize:10,color:'#555',fontFamily:'JetBrains Mono,monospace'}}>
+                        Exit code: {runOutput?.code}
+                      </span>
+                    )}
+                    <button onClick={()=>setShowOutput(false)}
+                      style={{background:'none',border:'none',color:'#555',cursor:'pointer',fontSize:16,lineHeight:1}}>×</button>
+                  </div>
+                </div>
+                <div style={{padding:14,fontFamily:'JetBrains Mono,monospace',fontSize:12,lineHeight:1.8,maxHeight:300,overflowY:'auto'}}>
+                  {runOutput?.stdout&&(
+                    <pre style={{color:'#00ff88',margin:0,whiteSpace:'pre-wrap'}}>{runOutput.stdout}</pre>
+                  )}
+                  {runOutput?.stderr&&(
+                    <pre style={{color:'#ff6b6b',margin:0,whiteSpace:'pre-wrap',marginTop:runOutput?.stdout?8:0}}>{runOutput.stderr}</pre>
+                  )}
+                  {!runOutput?.stdout&&!runOutput?.stderr&&!running&&(
+                    <span style={{color:'#555'}}>(aucune sortie)</span>
+                  )}
+                </div>
+              </motion.div>
+            )}
+
             {/* Raccourcis */}
             <div style={{display:'flex',gap:12,flexWrap:'wrap',marginTop:10,fontSize:11,color:C.t3,fontFamily:'JetBrains Mono,monospace'}}>
               {[['Ctrl+S','Sauvegarder'],['Ctrl+Shift+F','Formater'],['Ctrl+F','Rechercher'],['Tab','Indenter'],['(/{/[','Auto-fermer']].map(([k,l])=>(
@@ -964,187 +798,14 @@ export function DevSpace(){
         )}
 
         {/* ══════════════════════════════════════════
-            DOCKER
+            DOCKER (réel)
         ══════════════════════════════════════════ */}
-        {activeTab==='docker'&&(
-          <motion.div key="docker" initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0}}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
-              <h3 style={{fontFamily:'Orbitron,sans-serif',fontWeight:700,fontSize:15,color:C.t1,margin:0}}>🐳 Containers Docker</h3>
-              <div style={{display:'flex',gap:8}}>
-                <span style={{fontSize:12,color:C.t3}}>
-                  {containers.filter(c=>c.status==='running').length}/{containers.length} actifs
-                </span>
-                <button onClick={()=>showToast('Refresh containers...','info')}
-                  style={{...S.btnGhost,padding:'6px 10px'}}><RefreshCw size={13}/></button>
-              </div>
-            </div>
-            <div style={{display:'grid',gap:12}}>
-              {containers.map(c=>{
-                const isBusy=dockerBusy===c.id
-                const isRunning=c.status==='running'
-                return(
-                  <motion.div key={c.id} initial={{opacity:0,x:-10}} animate={{opacity:1,x:0}}
-                    style={{...S.panel({padding:16,display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'})}}>
-                    {/* Statut */}
-                    <div style={{width:10,height:10,borderRadius:'50%',flexShrink:0,
-                      background:isRunning?C.neon:C.t3,
-                      boxShadow:isRunning?`0 0 8px ${C.neon}`:'none'}}>
-                      {isRunning&&<motion.div style={{width:'100%',height:'100%',borderRadius:'50%',background:C.neon}}
-                        animate={{opacity:[1,0.3,1]}} transition={{duration:2,repeat:Infinity}}/>}
-                    </div>
-                    {/* Infos */}
-                    <div style={{flex:1,minWidth:120}}>
-                      <p style={{fontFamily:'Orbitron,sans-serif',fontWeight:700,fontSize:12,color:C.t1}}>{c.name}</p>
-                      <p style={{fontSize:10,color:C.t3,fontFamily:'JetBrains Mono,monospace'}}>{c.image}</p>
-                    </div>
-                    {/* Ports */}
-                    <span style={{fontSize:10,fontFamily:'JetBrains Mono,monospace',color:C.cyan,
-                      padding:'2px 8px',borderRadius:5,background:'rgba(0,200,255,0.08)',border:'1px solid rgba(0,200,255,0.2)'}}>
-                      {c.ports}
-                    </span>
-                    {/* Métriques */}
-                    {isRunning&&(
-                      <div style={{display:'flex',gap:12,fontSize:10,color:C.t2}}>
-                        <span>CPU <b style={{color:c.cpu>70?C.nova:C.neon}}>{c.cpu}%</b></span>
-                        <span>MEM <b style={{color:c.mem>80?C.nova:C.cyan}}>{c.mem}%</b></span>
-                        <span style={{color:C.t3}}>⏱ {c.uptime}</span>
-                      </div>
-                    )}
-                    {/* Actions */}
-                    <div style={{display:'flex',gap:6}}>
-                      <button onClick={()=>toggleContainer(c.id,c.status)} disabled={!!isBusy}
-                        style={{padding:'6px 12px',borderRadius:7,border:'none',fontSize:10,fontFamily:'Orbitron,sans-serif',fontWeight:700,
-                          cursor:isBusy?'not-allowed':'pointer',
-                          background:isRunning?'rgba(255,45,120,0.15)':'rgba(0,255,136,0.15)',
-                          color:isRunning?C.nova:C.neon,
-                          transition:'all 0.15s'}}>
-                        {isBusy
-                          ?<motion.span animate={{rotate:360}} transition={{repeat:Infinity,duration:0.6,ease:'linear'}}
-                              style={{display:'inline-block',width:10,height:10,borderRadius:'50%',border:`2px solid currentColor`,borderTopColor:'transparent'}}/>
-                          :(isRunning?<><Square size={9}/> Stop</>:<><Play size={9}/> Start</>)}
-                      </button>
-                      {isRunning&&(
-                        <button onClick={()=>restartContainer(c.id)} disabled={!!isBusy}
-                          style={{...S.btnGhost,padding:'6px 10px',fontSize:10}}>
-                          <RefreshCw size={10}/>
-                        </button>
-                      )}
-                    </div>
-                  </motion.div>
-                )
-              })}
-            </div>
-          </motion.div>
-        )}
+        {activeTab==='docker' && <DockerPanel key="docker"/>}
 
         {/* ══════════════════════════════════════════
-            BASE DE DONNÉES
+            BASE DE DONNÉES (réel, lecture seule)
         ══════════════════════════════════════════ */}
-        {activeTab==='db'&&(
-          <motion.div key="db" initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0}}>
-            <div style={{display:'grid',gridTemplateColumns:'220px 1fr',gap:16,minHeight:500}}>
-              {/* Tables */}
-              <div style={{...S.panel({padding:0,overflow:'hidden'})}}>
-                <div style={{padding:'11px 14px',borderBottom:`1px solid ${C.border}`}}>
-                  <p style={{...S.label,margin:0}}>🗄️ TABLES POSTGRESQL</p>
-                </div>
-                <div style={{padding:8}}>
-                  {dbTables.map(t=>(
-                    <button key={t.name} onClick={()=>{
-                      setDbActiveTable(t.name)
-                      setDbQuery(`SELECT * FROM ${t.name} LIMIT 10;`)
-                    }}
-                      style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',
-                        padding:'9px 10px',borderRadius:8,marginBottom:3,border:'none',textAlign:'left',cursor:'pointer',
-                        background:dbActiveTable===t.name?'rgba(0,200,255,0.1)':'none',
-                        transition:'all 0.15s'}}>
-                      <div>
-                        <p style={{fontSize:12,fontFamily:'JetBrains Mono,monospace',color:dbActiveTable===t.name?C.cyan:C.t1}}>{t.name}</p>
-                        <p style={{fontSize:9,color:C.t3}}>{t.rows} enreg. · {t.size}</p>
-                      </div>
-                      <span style={{fontSize:9,color:C.t3}}>{t.lastUpdate}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {/* Query editor + résultats */}
-              <div style={{display:'flex',flexDirection:'column',gap:12}}>
-                <div style={{...S.panel({padding:0,overflow:'hidden'})}}>
-                  <div style={{padding:'10px 14px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                    <p style={{...S.label,margin:0}}>📝 REQUÊTE SQL</p>
-                    <div style={{display:'flex',gap:7}}>
-                      <button onClick={()=>setDbQuery('SELECT * FROM users LIMIT 10;')}
-                        style={{...S.btnGhost,fontSize:10,padding:'4px 8px'}}>Exemple</button>
-                      <button onClick={runQuery} disabled={dbRunning}
-                        style={{padding:'6px 14px',borderRadius:7,border:'none',fontSize:11,fontFamily:'Orbitron,sans-serif',fontWeight:700,
-                          background:dbRunning?'rgba(0,200,255,0.3)':C.cyan,color:'#020408',cursor:dbRunning?'not-allowed':'pointer',
-                          display:'flex',alignItems:'center',gap:5}}>
-                        {dbRunning
-                          ?<><motion.span animate={{rotate:360}} transition={{repeat:Infinity,duration:0.6,ease:'linear'}}
-                              style={{display:'inline-block',width:10,height:10,borderRadius:'50%',border:'2px solid #020408',borderTopColor:'transparent'}}/> Exécution...</>
-                          :<><Play size={11}/> Exécuter (F5)</>}
-                      </button>
-                    </div>
-                  </div>
-                  <textarea value={dbQuery} onChange={e=>setDbQuery(e.target.value)}
-                    onKeyDown={e=>e.key==='F5'&&runQuery()}
-                    style={{width:'100%',height:90,padding:14,background:'#000',border:'none',outline:'none',
-                      color:C.neon,fontFamily:'JetBrains Mono,monospace',fontSize:13,resize:'none',lineHeight:1.6,boxSizing:'border-box'}}/>
-                </div>
-                {/* Résultats */}
-                {dbResult&&(
-                  <motion.div initial={{opacity:0,y:8}} animate={{opacity:1,y:0}}
-                    style={{...S.panel({padding:0,overflow:'hidden'})}}>
-                    <div style={{padding:'10px 14px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:10}}>
-                      <p style={{...S.label,margin:0}}>
-                        {dbResult.type==='error'?'❌ ERREUR':dbResult.type==='dml'?'✓ RÉSULTAT':'📊 RÉSULTATS'}
-                      </p>
-                      {dbResult.duration&&<span style={{fontSize:10,color:C.t3,fontFamily:'JetBrains Mono,monospace'}}>{dbResult.duration}</span>}
-                    </div>
-                    <div style={{padding:14,maxHeight:250,overflowY:'auto'}}>
-                      {dbResult.type==='error'&&(
-                        <p style={{color:C.nova,fontFamily:'JetBrains Mono,monospace',fontSize:12}}>{dbResult.message}</p>
-                      )}
-                      {dbResult.type==='dml'&&(
-                        <p style={{color:C.neon,fontFamily:'JetBrains Mono,monospace',fontSize:12}}>{dbResult.message} — Modifié avec succès</p>
-                      )}
-                      {dbResult.type==='select'&&(
-                        <>
-                          <p style={{fontSize:11,color:C.t3,marginBottom:8}}>{dbResult.count} lignes trouvées</p>
-                          <div style={{overflowX:'auto'}}>
-                            <table style={{width:'100%',borderCollapse:'collapse',fontSize:11,fontFamily:'JetBrains Mono,monospace'}}>
-                              <thead>
-                                <tr>
-                                  {dbResult.columns.map(col=>(
-                                    <th key={col} style={{padding:'6px 10px',textAlign:'left',borderBottom:`1px solid ${C.border}`,
-                                      fontSize:9,fontFamily:'Orbitron,sans-serif',fontWeight:700,color:C.t3,whiteSpace:'nowrap'}}>
-                                      {col.toUpperCase()}
-                                    </th>
-                                  ))}
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {dbResult.rows.map((row,i)=>(
-                                  <tr key={i} style={{borderBottom:`1px solid ${C.border}`}}>
-                                    {dbResult.columns.map(col=>(
-                                      <td key={col} style={{padding:'7px 10px',color:C.t2,whiteSpace:'nowrap',maxWidth:150,overflow:'hidden',textOverflow:'ellipsis'}}>
-                                        {String(row[col]??'NULL')}
-                                      </td>
-                                    ))}
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </motion.div>
-                )}
-              </div>
-            </div>
-          </motion.div>
-        )}
+        {activeTab==='db' && <DbQueryPanel key="db"/>}
 
         {/* ══════════════════════════════════════════
             DEBUGGER
@@ -1258,15 +919,27 @@ export function DevSpace(){
 
             {/* Actions */}
             <div style={{display:'flex',gap:10,marginBottom:16,flexWrap:'wrap'}}>
-              <button onClick={()=>runTests()} disabled={testRunning}
-                style={{...S.btnCyan,display:'flex',alignItems:'center',gap:6,opacity:testRunning?0.5:1,cursor:testRunning?'not-allowed':'pointer'}}>
+              <button onClick={()=>runTests()} disabled={testRunning||testsLoading||tests.length===0}
+                style={{...S.btnCyan,display:'flex',alignItems:'center',gap:6,opacity:(testRunning||testsLoading)?0.5:1,cursor:testRunning?'not-allowed':'pointer'}}>
                 <Play size={13}/> Tous les tests
               </button>
-              <button onClick={()=>setTests(MOCK_TESTS)} disabled={testRunning}
+              <button onClick={loadTestSuites} disabled={testRunning||testsLoading}
                 style={{...S.btnGhost,display:'flex',alignItems:'center',gap:6}}>
-                <RefreshCw size={13}/> Reset
+                <RefreshCw size={13}/> Recharger la liste
               </button>
             </div>
+
+            {testsLoading&&(
+              <div style={{...S.panel({padding:20,textAlign:'center'}),fontSize:12,color:C.t3}}>
+                Chargement des classes de test depuis le backend…
+              </div>
+            )}
+
+            {!testsLoading&&tests.length===0&&(
+              <div style={{...S.panel({padding:20,textAlign:'center'}),fontSize:12,color:C.t3}}>
+                Aucune classe de test trouvée dans tests/Unit ou tests/Feature.
+              </div>
+            )}
 
             {/* Fichiers de tests */}
             <div style={{display:'flex',flexDirection:'column',gap:10}}>
@@ -1275,18 +948,20 @@ export function DevSpace(){
                   style={{...S.panel({padding:16})}}>
                   <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
                     <div style={{width:28,height:28,borderRadius:7,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',
-                      background:t.status==='pass'?'rgba(0,255,136,0.1)':'rgba(255,45,120,0.1)',
-                      border:`1px solid ${t.status==='pass'?'rgba(0,255,136,0.3)':'rgba(255,45,120,0.3)'}`}}>
-                      {t.status==='pass'
-                        ?<CheckCircle size={14} style={{color:C.neon}}/>
-                        :<XCircle size={14} style={{color:C.nova}}/>}
+                      background:t.status==='fail'?'rgba(255,45,120,0.1)':t.status==='pass'?'rgba(0,255,136,0.1)':'rgba(255,255,255,0.05)',
+                      border:`1px solid ${t.status==='fail'?'rgba(255,45,120,0.3)':t.status==='pass'?'rgba(0,255,136,0.3)':'rgba(255,255,255,0.12)'}`}}>
+                      {t.status==='fail'
+                        ?<XCircle size={14} style={{color:C.nova}}/>
+                        :t.status==='pass'
+                          ?<CheckCircle size={14} style={{color:C.neon}}/>
+                          :<TestTube size={14} style={{color:C.t3}}/>}
                     </div>
                     <div style={{flex:1,minWidth:120}}>
                       <p style={{fontSize:12,fontFamily:'JetBrains Mono,monospace',color:C.t1}}>{t.file}</p>
                       <p style={{fontSize:10,color:C.t3}}>{t.tests} tests · {t.duration}</p>
                     </div>
                     <div style={{display:'flex',gap:10,fontSize:11}}>
-                      <span style={{color:C.neon}}>{t.passed} ✓</span>
+                      {t.status!=='idle'&&<span style={{color:C.neon}}>{t.passed} ✓</span>}
                       {t.failed>0&&<span style={{color:C.nova}}>{t.failed} ✗</span>}
                     </div>
                     <button onClick={()=>runTests(t.file)} disabled={testRunning}
@@ -1294,12 +969,12 @@ export function DevSpace(){
                       <Play size={10}/> Relancer
                     </button>
                   </div>
-                  {t.failed>0&&(
-                    <div style={{marginTop:10,padding:'8px 12px',background:'rgba(255,45,120,0.06)',borderRadius:7,
-                      border:'1px solid rgba(255,45,120,0.2)',fontSize:11,color:C.nova,fontFamily:'JetBrains Mono,monospace'}}>
-                      ✗ Échec: expect(wrapper.text()).toContain("DevSpace") — reçu "" — {t.file}:142
+                  {t.failed>0&&t.cases.filter(c=>c.status==='fail').map(c=>(
+                    <div key={c.name} style={{marginTop:10,padding:'8px 12px',background:'rgba(255,45,120,0.06)',borderRadius:7,
+                      border:'1px solid rgba(255,45,120,0.2)',fontSize:11,color:C.nova,fontFamily:'JetBrains Mono,monospace',whiteSpace:'pre-wrap'}}>
+                      ✗ {c.name} — {c.message||'Échec (voir la sortie phpunit)'}
                     </div>
-                  )}
+                  ))}
                 </motion.div>
               ))}
             </div>
@@ -1307,85 +982,9 @@ export function DevSpace(){
         )}
 
         {/* ══════════════════════════════════════════
-            PROFILER
+            PROFILER (réel — Web Vitals)
         ══════════════════════════════════════════ */}
-        {activeTab==='perf'&&(
-          <motion.div key="perf" initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
-              <h3 style={{fontFamily:'Orbitron,sans-serif',fontWeight:700,fontSize:15,color:C.t1,margin:0}}>📊 Core Web Vitals</h3>
-              <button onClick={refreshPerf} disabled={perfRefreshing}
-                style={{...S.btnCyan,display:'flex',alignItems:'center',gap:6,opacity:perfRefreshing?0.5:1}}>
-                <RefreshCw size={12} style={perfRefreshing?{animation:'spin 0.6s linear infinite'}:{}}/> Actualiser
-              </button>
-            </div>
-
-            {/* Vitals */}
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(150px,1fr))',gap:12,marginBottom:20}}>
-              {[
-                {k:'LCP',v:`${perfData.lcp}ms`, label:'Largest Contentful Paint', good:2500,bad:4000,raw:perfData.lcp},
-                {k:'FID',v:`${perfData.fid}ms`,  label:'First Input Delay',        good:100, bad:300, raw:perfData.fid},
-                {k:'CLS',v:perfData.cls.toFixed(3),label:'Cumulative Layout Shift', good:0.1, bad:0.25,raw:perfData.cls*1000},
-                {k:'TTFB',v:`${perfData.ttfb}ms`,label:'Time to First Byte',       good:800, bad:1800,raw:perfData.ttfb},
-                {k:'FCP',v:`${perfData.fcp}ms`,  label:'First Contentful Paint',   good:1800,bad:3000,raw:perfData.fcp},
-                {k:'TTI',v:`${perfData.tti}ms`,  label:'Time to Interactive',      good:3800,bad:7300,raw:perfData.tti},
-              ].map(m=>{
-                const color=m.raw<m.good?C.neon:m.raw<m.bad?C.quantum:C.nova
-                return(
-                  <div key={m.k} style={{...S.panel({padding:14,textAlign:'center'})}}>
-                    <p style={{fontSize:9,fontFamily:'Orbitron,sans-serif',fontWeight:700,color:C.t3,marginBottom:6}}>{m.k}</p>
-                    <p style={{fontFamily:'Orbitron,sans-serif',fontWeight:900,fontSize:20,color,marginBottom:4}}>{m.v}</p>
-                    <p style={{fontSize:9,color:C.t3,lineHeight:1.3}}>{m.label}</p>
-                    <div style={{marginTop:6,fontSize:9,color,fontFamily:'Orbitron,sans-serif',fontWeight:700}}>
-                      {m.raw<m.good?'✓ BON':m.raw<m.bad?'⚠ MOYEN':'✗ MAUVAIS'}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-
-            {/* Mémoire */}
-            <div style={{...S.panel({padding:18,marginBottom:16})}}>
-              <PanelHeader icon={BarChart3} title="Mémoire" color={C.plasma}/>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:16,marginTop:10}}>
-                {[
-                  {l:'Utilisée',v:perfData.memory.used,total:perfData.memory.total,c:C.cyan},
-                  {l:'Heap JS',  v:perfData.memory.heap,total:perfData.memory.total,c:C.plasma},
-                  {l:'Libre',    v:perfData.memory.total-perfData.memory.used,total:perfData.memory.total,c:C.neon},
-                ].map(m=>(
-                  <div key={m.l}>
-                    <div style={{display:'flex',justifyContent:'space-between',fontSize:11,marginBottom:5}}>
-                      <span style={{color:C.t2}}>{m.l}</span>
-                      <span style={{color:m.c,fontFamily:'Orbitron,sans-serif',fontWeight:700}}>{m.v.toFixed(1)} MB</span>
-                    </div>
-                    <div style={{height:6,background:'rgba(255,255,255,0.06)',borderRadius:10,overflow:'hidden'}}>
-                      <motion.div style={{height:'100%',background:m.c,borderRadius:10}}
-                        initial={{width:0}} animate={{width:`${(m.v/m.total)*100}%`}} transition={{duration:1}}/>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* API Performance */}
-            <div style={{...S.panel({padding:18})}}>
-              <PanelHeader icon={Server} title="Performance API" color={C.solar}/>
-              <div style={{marginTop:12}}>
-                {perfData.api.map(a=>{
-                  const color=a.avg<20?C.neon:a.avg<50?C.quantum:C.nova
-                  return(
-                    <div key={a.endpoint} style={{display:'flex',alignItems:'center',gap:12,padding:'9px 0',borderBottom:`1px solid ${C.border}`}}>
-                      <span style={{fontFamily:'JetBrains Mono,monospace',fontSize:11,color:C.t2,flex:1}}>{a.endpoint}</span>
-                      <span style={{fontSize:10,color:C.t3}}>{a.calls} appels</span>
-                      <span style={{fontSize:10,color:C.t3}}>min:{a.min}ms</span>
-                      <span style={{fontSize:10,color:C.t3}}>max:{a.max}ms</span>
-                      <span style={{fontFamily:'Orbitron,sans-serif',fontWeight:700,fontSize:12,color,minWidth:55,textAlign:'right'}}>∅ {a.avg}ms</span>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </motion.div>
-        )}
+        {activeTab==='perf' && <ProfilerPanel key="perf"/>}
 
         {/* ══════════════════════════════════════════
             CONFIG

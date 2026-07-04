@@ -34,7 +34,10 @@ export default function AdminValidation(){
         setTimeout(()=>setMsg(null),3000)
       }
     } catch(e){ console.error(e) }
-    finally{ setLoading(l=>({...l,[id]:null})) }
+    finally{
+      setLoading(l=>({...l,[id]:null}))
+      setBusy(false)
+    }
   }
 
   const reject = async(id) => {
@@ -47,7 +50,10 @@ export default function AdminValidation(){
         setTimeout(()=>setMsg(null),3000)
       }
     } catch(e){ console.error(e) }
-    finally{ setLoading(l=>({...l,[id]:null})) }
+    finally{
+      setLoading(l=>({...l,[id]:null}))
+      setBusy(false)
+    }
   }
 
   if(user?.role!=='admin') return(
@@ -95,13 +101,23 @@ export default function AdminValidation(){
 
       {/* Contenu */}
       {busy ? <Loader/> : pending.length===0 ? (
-        <div style={S.panel({padding:40,textAlign:'center'})}>
-          <Shield size={40} style={{color:C.neon,margin:'0 auto 16px'}}/>
-          <p style={{fontFamily:'Orbitron,sans-serif',fontWeight:700,fontSize:14,color:C.t1,marginBottom:8}}>
+        <motion.div
+          key="empty"
+          initial={{opacity:0,y:16}}
+          animate={{opacity:1,y:0}}
+          transition={{duration:0.4}}
+          style={S.panel({padding:48,textAlign:'center'})}>
+          <motion.div
+            initial={{scale:0.7,opacity:0}}
+            animate={{scale:1,opacity:1}}
+            transition={{delay:0.1,type:'spring',stiffness:200}}>
+            <Shield size={48} style={{color:C.neon,margin:'0 auto 18px'}}/>
+          </motion.div>
+          <p style={{fontFamily:'Orbitron,sans-serif',fontWeight:700,fontSize:15,color:C.t1,marginBottom:10}}>
             AUCUN COMPTE EN ATTENTE
           </p>
           <p style={{fontSize:13,color:C.t3}}>Tous les comptes ont ete traites.</p>
-        </div>
+        </motion.div>
       ) : (
         <div style={{display:'flex',flexDirection:'column',gap:14}}>
           {pending.map((u,i)=>(

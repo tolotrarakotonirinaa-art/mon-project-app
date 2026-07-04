@@ -1,9 +1,10 @@
-import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Server, Plus, Trash2, RefreshCw, ExternalLink, Copy, CheckCircle } from 'lucide-react'
+import { Server, Plus, Trash2, RefreshCw, ExternalLink, Copy } from 'lucide-react'
 import { useApp } from '../context/AppContext.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { Loader, Empty } from '../components/ui/UI.jsx'
+import { api } from '../services/api.js'
 import { C, S } from '../styles.js'
 import { MShell, PT, useConfirm } from './shared/PageUtils.jsx'
 
@@ -12,9 +13,9 @@ import { MShell, PT, useConfirm } from './shared/PageUtils.jsx'
 // ════════════════════════════════════════════
 
 const ENV_COLORS = {
-  dev:        '#00c8ff',
-  staging:    '#ffce00',
-  production: '#00ff88',
+  dev:        'var(--accent)',
+  staging:    'var(--accent3)',
+  production: 'var(--accent2)',
 }
 
 const ENV_ICONS = {
@@ -23,15 +24,6 @@ const ENV_ICONS = {
   production: '🚀',
 }
 
-const DEPLOY_STEPS = [
-  { msg: '🔍 Vérification du code source...', p: 15 },
-  { msg: '🧪 Exécution des tests...',         p: 35 },
-  { msg: "🔨 Build de l'application...",      p: 60 },
-  { msg: "🐳 Construction de l'image Docker...", p: 80 },
-  { msg: '🚀 Déploiement en cours...',        p: 95 },
-  { msg: '✓ Déploiement terminé avec succès !', p: 100 },
-]
-
 const EMPTY_FORM = { name: '', type: 'dev', url: '', version: '1.0.0' }
 
 // ════════════════════════════════════════════
@@ -39,7 +31,7 @@ const EMPTY_FORM = { name: '', type: 'dev', url: '', version: '1.0.0' }
 // ════════════════════════════════════════════
 
 function isValidUrl(str) {
-  if (!str) return true // URL est optionnelle
+  if (!str) return true
   try { new URL(str); return true } catch { return false }
 }
 
@@ -48,73 +40,77 @@ function isValidVersion(str) {
 }
 
 function getMetricColor(value, baseColor) {
-  if (value > 80) return C.nova
-  if (value > 60) return C.quantum
+  if (value > 80) return '#ff2d78'
+  if (value > 60) return '#ffce00'
   return baseColor
+}
+
+function formatDate(val) {
+  if (!val) return '—'
+  try { return new Date(val).toLocaleString('fr-FR') } catch { return val }
 }
 
 // ════════════════════════════════════════════
 //  CUSTOM HOOKS
 // ════════════════════════════════════════════
 
-function useEnvironments(getEnvs, showToast) {
-  const [envs, setEnvs]   = useState([])
-  const [busy, setBusy]   = useState(true)
+function useEnvironments(showToast) {
+  const [envs, setEnvs] = useState([])
+  const [busy, setBusy] = useState(true)
 
   const load = useCallback(async () => {
     setBusy(true)
     try {
-      setEnvs(await getEnvs() || [])
+      const res = await api.getEnvs()
+      if (res?.success === false) {
+        showToast(res.message || 'Erreur de chargement', 'danger')
+      } else {
+        setEnvs(res?.data || res?.environments || (Array.isArray(res) ? res : []))
+      }
     } catch {
-      showToast('Erreur de chargement', 'danger')
+      showToast('Impossible de contacter le serveur', 'danger')
     } finally {
       setBusy(false)
     }
-  }, [getEnvs, showToast])
+  }, [showToast])
 
   useEffect(() => { load() }, [load])
 
-  return { envs, busy, load }
+  return { envs, setEnvs, busy, load }
 }
 
-function useDeploy(deployEnv, showToast) {
-  const [deploying,      setDeploying]      = useState(null)
-  const [deployLogs,     setDeployLogs]     = useState({})   // { [envId]: string[] }
-  const [deployProgress, setDeployProgress] = useState({})   // { [envId]: number }
+// Hook deploy — miantso backend, manavao DB fotsiny
+function useDeploy(showToast) {
+  const [deploying, setDeploying] = useState(null)
 
   const deploy = useCallback(async (env, onDone) => {
-    const id = env.id
-    setDeploying(id)
-    setDeployProgress(p => ({ ...p, [id]: 0 }))
-    setDeployLogs(l => ({ ...l, [id]: [] }))
-
-    const logs = []
-    for (const step of DEPLOY_STEPS) {
-      logs.push(`[${new Date().toLocaleTimeString('fr-FR')}] ${step.msg}`)
-      setDeployLogs(l => ({ ...l, [id]: [...logs] }))
-      setDeployProgress(p => ({ ...p, [id]: step.p }))
-      await new Promise(r => setTimeout(r, 500 + Math.random() * 400))
-    }
-
+    setDeploying(env.id)
     try {
-      if (deployEnv) await deployEnv(id)
-    } catch (e) {
-      const warn = `[${new Date().toLocaleTimeString('fr-FR')}] ⚠️ API: ${e?.message || 'Non disponible — mode simulation'}`
-      logs.push(warn)
-      setDeployLogs(l => ({ ...l, [id]: [...logs] }))
+      const res = await api.deployEnv(env.id)
+
+      if (res?.success === false) {
+        showToast(res.message || 'Erreur lors du déploiement', 'danger')
+        return
+      }
+
+      // Manavao ny env card avy amin'ny response backend
+      onDone?.(env.id, res?.data?.last_deploy, res?.data?.status, res?.data?.version)
+      showToast(`${env.name} déployé avec succès ✓`, 'success')
+
+    } catch {
+      showToast('Erreur serveur — déploiement échoué', 'danger')
+    } finally {
+      setDeploying(null)
     }
+  }, [showToast])
 
-    showToast(`${env.name} déployé avec succès ! ✓`, 'success')
-    setDeploying(null)
-    onDone?.()
-  }, [deployEnv, showToast])
-
-  return { deploying, deployLogs, deployProgress, deploy }
+  return { deploying, deploy }
 }
 
-function useEnvForm(addEnv, showToast, onSuccess) {
+function useEnvForm(showToast, onSuccess) {
   const [fields, setFields] = useState(EMPTY_FORM)
   const [errors, setErrors] = useState({})
+  const [saving, setSaving] = useState(false)
 
   const setField = useCallback((key) => (e) => {
     setFields(prev => ({ ...prev, [key]: e.target.value }))
@@ -123,8 +119,8 @@ function useEnvForm(addEnv, showToast, onSuccess) {
 
   const validate = useCallback(() => {
     const e = {}
-    if (!fields.name.trim())          e.name    = 'Le nom est requis'
-    if (!isValidUrl(fields.url))       e.url     = 'URL invalide (ex: https://monapp.com)'
+    if (!fields.name.trim())             e.name    = 'Le nom est requis'
+    if (!isValidUrl(fields.url))         e.url     = 'URL invalide (ex: https://monapp.com)'
     if (!isValidVersion(fields.version)) e.version = 'Version invalide (ex: 1.0.0)'
     setErrors(e)
     return Object.keys(e).length === 0
@@ -132,61 +128,69 @@ function useEnvForm(addEnv, showToast, onSuccess) {
 
   const save = useCallback(async () => {
     if (!validate()) return
+    setSaving(true)
     try {
-      await addEnv(fields)
-      showToast('Environnement créé !', 'success')
-      setFields(EMPTY_FORM)
-      setErrors({})
-      onSuccess?.()
-    } catch (e) {
-      showToast(e?.message || 'Erreur lors de la création', 'danger')
+      const res = await api.createEnv(fields)
+      if (res?.success === false) {
+        if (res.errors) setErrors(res.errors)
+        showToast(res.message || 'Erreur lors de la création', 'danger')
+      } else {
+        showToast('Environnement créé !', 'success')
+        setFields(EMPTY_FORM)
+        setErrors({})
+        onSuccess?.()
+      }
+    } catch {
+      showToast('Impossible de contacter le serveur', 'danger')
+    } finally {
+      setSaving(false)
     }
-  }, [fields, validate, addEnv, showToast, onSuccess])
+  }, [fields, validate, showToast, onSuccess])
 
-  const reset = useCallback(() => {
-    setFields(EMPTY_FORM)
-    setErrors({})
-  }, [])
+  const reset = useCallback(() => { setFields(EMPTY_FORM); setErrors({}) }, [])
 
-  return { fields, errors, setField, save, reset }
+  return { fields, errors, saving, setField, save, reset }
 }
 
 // ════════════════════════════════════════════
 //  SUB-COMPONENTS
 // ════════════════════════════════════════════
 
-/** Barre de métriques CPU / RAM */
 function MetricBar({ label, value, color }) {
-  const barColor = getMetricColor(value, color)
+  const val      = typeof value === 'number' ? value : 0
+  const barColor = getMetricColor(val, color)
   return (
     <div style={{ marginBottom: 8 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 3 }}>
         <span style={{ color: C.t2 }}>{label}</span>
         <span style={{ color: barColor, fontFamily: 'Orbitron, sans-serif', fontWeight: 700 }}>
-          {value}%
+          {val}%
         </span>
       </div>
       <div style={{ height: 5, background: 'rgba(255,255,255,0.06)', borderRadius: 10, overflow: 'hidden' }}>
         <motion.div
           style={{ height: '100%', background: barColor, borderRadius: 10 }}
           initial={{ width: 0 }}
-          animate={{ width: `${value}%` }}
-          transition={{ duration: 1 }}
+          animate={{ width: `${val}%` }}
+          transition={{ duration: 0.8 }}
         />
       </div>
     </div>
   )
 }
 
-/** Ligne d'information (URL, Version, Dernier déploiement) */
-function InfoRow({ label, value, color, copyable, onCopy }) {
+function InfoRow({ label, value, color, copyable }) {
+  const copy = useCallback(() => {
+    if (value) navigator.clipboard?.writeText(value).catch(() => {})
+  }, [value])
+
   return (
     <div style={{
       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
       padding: '7px 0', borderBottom: `1px solid ${C.border}`, fontSize: 12,
     }}>
       <span style={{ color: C.t2 }}>{label}</span>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 5, maxWidth: 160 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, maxWidth: 180 }}>
         <span style={{
           fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: color || C.t1,
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -194,11 +198,8 @@ function InfoRow({ label, value, color, copyable, onCopy }) {
           {value || '—'}
         </span>
         {copyable && value && (
-          <button
-            onClick={() => onCopy(value)}
-            title="Copier"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.t3, padding: 0, display: 'flex' }}
-          >
+          <button onClick={copy} title="Copier"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.t3, padding: 0, display: 'flex' }}>
             <Copy size={10} />
           </button>
         )}
@@ -207,53 +208,6 @@ function InfoRow({ label, value, color, copyable, onCopy }) {
   )
 }
 
-/** Terminal de logs de déploiement */
-function DeployTerminal({ logs, progress, color }) {
-  const bottomRef = useRef(null)
-
-  // Auto-scroll vers le bas à chaque nouveau log
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [logs])
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, height: 0 }}
-      animate={{ opacity: 1, height: 'auto' }}
-      style={{
-        marginTop: 12, padding: 10,
-        background: '#000', borderRadius: 8,
-        border: '1px solid rgba(0,255,136,0.15)',
-        maxHeight: 120, overflowY: 'auto',
-      }}
-    >
-      <div style={{ marginBottom: 6 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: C.t3, marginBottom: 4, fontFamily: 'Orbitron, sans-serif' }}>
-          <span>DEPLOY LOG</span>
-          <span>{progress}%</span>
-        </div>
-        <div style={{ height: 3, background: 'rgba(255,255,255,0.06)', borderRadius: 10, overflow: 'hidden' }}>
-          <motion.div
-            style={{ height: '100%', background: color, borderRadius: 10 }}
-            animate={{ width: `${progress}%` }}
-            transition={{ duration: 0.4 }}
-          />
-        </div>
-      </div>
-      {logs.map((line, i) => (
-        <div key={i} style={{
-          fontSize: 10, color: line.includes('⚠️') ? '#ffce00' : '#00ff88',
-          fontFamily: 'JetBrains Mono, monospace', lineHeight: 1.6,
-        }}>
-          {line}
-        </div>
-      ))}
-      <div ref={bottomRef} />
-    </motion.div>
-  )
-}
-
-/** Champ de formulaire avec label + erreur inline */
 function FormField({ label, error, children }) {
   return (
     <div>
@@ -273,16 +227,16 @@ function FormField({ label, error, children }) {
   )
 }
 
-/** Carte d'un environnement */
-function EnvCard({ env, deploying, deployLogs, deployProgress, onDeploy, onDelete, can }) {
+function EnvCard({ env, deploying, onDeploy, onDelete, can }) {
   const col   = ENV_COLORS[env.type] || C.cyan
   const isDep = deploying === env.id
-  const logs  = deployLogs[env.id]
-  const prog  = deployProgress[env.id] || 0
 
-  const copyToClipboard = useCallback((text) => {
-    navigator.clipboard?.writeText(text)
-  }, [])
+  const statusLabel = env.status || 'unknown'
+  const statusColor =
+    statusLabel === 'running'  || statusLabel === 'active'   ? '#00ff88'
+    : statusLabel === 'stopped' || statusLabel === 'inactive' ? '#ff2d78'
+    : statusLabel === 'deploying'                             ? '#ffce00'
+    : C.t3
 
   return (
     <motion.div
@@ -317,37 +271,37 @@ function EnvCard({ env, deploying, deployLogs, deployProgress, onDeploy, onDelet
           </div>
         </div>
 
-        {/* Badge statut */}
+        {/* Badge statut — avy amin'ny backend */}
         <span style={{
           fontSize: 9, fontFamily: 'Orbitron, sans-serif', fontWeight: 700,
           padding: '3px 8px', borderRadius: 5,
-          background: `${col}15`, color: col, border: `1px solid ${col}28`,
+          background: `${statusColor}15`, color: statusColor, border: `1px solid ${statusColor}28`,
           display: 'flex', alignItems: 'center', gap: 4,
         }}>
           <motion.span
-            style={{ width: 5, height: 5, borderRadius: '50%', background: col, display: 'inline-block' }}
-            animate={{ opacity: [1, 0.3, 1] }}
-            transition={{ duration: 1.5, repeat: Infinity }}
+            style={{ width: 5, height: 5, borderRadius: '50%', background: statusColor, display: 'inline-block' }}
+            animate={{ opacity: isDep ? [1, 0.3, 1] : 1 }}
+            transition={{ duration: 1.5, repeat: isDep ? Infinity : 0 }}
           />
-          {env.status || 'running'}
+          {isDep ? 'déploiement...' : statusLabel}
         </span>
       </div>
 
       {/* Infos */}
-      <InfoRow label="URL"     value={env.url}    color="#7ab0d4" copyable onCopy={copyToClipboard} />
+      <InfoRow label="URL"     value={env.url}     color="#7ab0d4" copyable />
       <InfoRow label="Version" value={env.version} />
-      <InfoRow label="Dernier déploiement" value={env.last_deploy || env.lastDeploy} />
+      <InfoRow label="Dernier déploiement" value={formatDate(env.last_deploy || env.lastDeploy)} />
 
-      {/* Métriques */}
+      {/* Métriques CPU / RAM — valeurs DB, tsy misy rand() */}
       <div style={{ marginTop: 12 }}>
-        <MetricBar label="CPU" value={env.cpu    || 0} color={col} />
-        <MetricBar label="RAM" value={env.memory || 0} color={col} />
+        <div style={{ marginBottom: 6 }}>
+          <span style={{ fontSize: 9, fontFamily: 'Orbitron, sans-serif', fontWeight: 700, color: C.t3 }}>
+            MÉTRIQUES
+          </span>
+        </div>
+        <MetricBar label="CPU" value={env.cpu    ?? 0} color={col} />
+        <MetricBar label="RAM" value={env.memory ?? 0} color={col} />
       </div>
-
-      {/* Terminal de déploiement */}
-      {isDep && logs && (
-        <DeployTerminal logs={logs} progress={prog} color={col} />
-      )}
 
       {/* Actions */}
       {can('environments') && (
@@ -358,7 +312,7 @@ function EnvCard({ env, deploying, deployLogs, deployProgress, onDeploy, onDelet
             style={{
               flex: 1, padding: '9px 13px', border: 'none', borderRadius: 9,
               background: isDep ? 'rgba(255,255,255,0.05)' : `linear-gradient(135deg,${col},${col}cc)`,
-              color: isDep ? C.t3 : '#020408',
+              color: isDep ? C.t3 : 'var(--bg)',
               fontFamily: 'Orbitron, sans-serif', fontWeight: 700, fontSize: 11,
               cursor: isDep ? 'not-allowed' : 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
@@ -394,8 +348,12 @@ function EnvCard({ env, deploying, deployLogs, deployProgress, onDeploy, onDelet
 
           <button
             onClick={() => onDelete(env.id)}
+            disabled={isDep}
             title="Supprimer"
-            style={{ ...S.btnGhost, padding: '9px 11px', fontSize: 11 }}
+            style={{
+              ...S.btnGhost, padding: '9px 11px', fontSize: 11,
+              opacity: isDep ? 0.4 : 1, cursor: isDep ? 'not-allowed' : 'pointer',
+            }}
           >
             <Trash2 size={12} />
           </button>
@@ -410,37 +368,46 @@ function EnvCard({ env, deploying, deployLogs, deployProgress, onDeploy, onDelet
 // ════════════════════════════════════════════
 
 export function Environments() {
-  const { getEnvs, addEnv, deleteEnv, deployEnv, showToast } = useApp()
-  const { can }  = useAuth()
+  const { showToast }       = useApp()
+  const { can }             = useAuth()
   const { confirm, Dialog } = useConfirm()
 
   const [modal, setModal] = useState(false)
 
-  const { envs, busy, load } = useEnvironments(getEnvs, showToast)
-
-  const { deploying, deployLogs, deployProgress, deploy } = useDeploy(deployEnv, showToast)
+  const { envs, setEnvs, busy, load } = useEnvironments(showToast)
+  const { deploying, deploy }         = useDeploy(showToast)
 
   const closeModal = useCallback(() => { setModal(false); formHook.reset() }, [])
-
-  const formHook = useEnvForm(addEnv, showToast, () => { closeModal(); load() })
+  const formHook   = useEnvForm(showToast, () => { closeModal(); load() })
 
   const handleDeploy = useCallback(async (env) => {
-    const ok = await confirm(`Déployer "${env.name}" ? L'environnement sera mis à jour.`)
+    const ok = await confirm(`Déployer "${env.name}" ? Le statut sera mis à jour.`)
     if (!ok) return
-    deploy(env, load)
-  }, [confirm, deploy, load])
+
+    deploy(env, (id, lastDeploy, status, version) => {
+      setEnvs(prev => prev.map(e =>
+        e.id === id
+          ? { ...e, last_deploy: lastDeploy ?? e.last_deploy, status: status ?? 'running', version: version ?? e.version }
+          : e
+      ))
+    })
+  }, [confirm, deploy, setEnvs])
 
   const handleDelete = useCallback(async (id) => {
     const ok = await confirm('Supprimer cet environnement ? Cette action est irréversible.')
     if (!ok) return
     try {
-      await deleteEnv(id)
-      showToast('Supprimé', 'success')
-      load()
+      const res = await api.deleteEnv(id)
+      if (res?.success === false) {
+        showToast(res.message || 'Erreur lors de la suppression', 'danger')
+      } else {
+        showToast('Environnement supprimé', 'success')
+        setEnvs(prev => prev.filter(e => e.id !== id))
+      }
     } catch {
-      showToast('Erreur lors de la suppression', 'danger')
+      showToast('Impossible de contacter le serveur', 'danger')
     }
-  }, [confirm, deleteEnv, showToast, load])
+  }, [confirm, setEnvs, showToast])
 
   if (busy) return <Loader />
 
@@ -455,7 +422,9 @@ export function Environments() {
       }}>
         <div>
           {PT('ENVIRONNEMENTS')}
-          <p style={{ color: C.t2, fontSize: 13, marginTop: 4 }}>Dev · Staging · Production</p>
+          <p style={{ color: C.t2, fontSize: 13, marginTop: 4 }}>
+            Dev · Staging · Production
+          </p>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button onClick={load} title="Rafraîchir" style={{ ...S.btnGhost, padding: '8px 12px' }}>
@@ -476,8 +445,6 @@ export function Environments() {
             <EnvCard
               env={env}
               deploying={deploying}
-              deployLogs={deployLogs}
-              deployProgress={deployProgress}
               onDeploy={handleDeploy}
               onDelete={handleDelete}
               can={can}
@@ -501,7 +468,7 @@ export function Environments() {
                   value={formHook.fields.name}
                   onChange={formHook.setField('name')}
                   placeholder="ex: Développement"
-                  onKeyDown={e => e.key === 'Enter' && formHook.save()}
+                  onKeyDown={e => e.key === 'Enter' && !formHook.saving && formHook.save()}
                   autoFocus
                 />
               </FormField>
@@ -537,8 +504,30 @@ export function Environments() {
               </FormField>
 
               <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                <button onClick={closeModal} style={S.btnGhost}>Annuler</button>
-                <button onClick={formHook.save} style={S.btnNeon}>Créer</button>
+                <button onClick={closeModal} disabled={formHook.saving} style={{ ...S.btnGhost, opacity: formHook.saving ? 0.5 : 1 }}>
+                  Annuler
+                </button>
+                <button
+                  onClick={formHook.save}
+                  disabled={formHook.saving}
+                  style={{
+                    ...S.btnNeon,
+                    opacity: formHook.saving ? 0.7 : 1,
+                    cursor: formHook.saving ? 'not-allowed' : 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                  }}
+                >
+                  {formHook.saving ? (
+                    <>
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 0.9, repeat: Infinity, ease: 'linear' }}
+                        style={{ width: 11, height: 11, borderRadius: '50%', border: '2px solid #020408', borderTopColor: 'transparent' }}
+                      />
+                      Création...
+                    </>
+                  ) : 'Créer'}
+                </button>
               </div>
 
             </div>

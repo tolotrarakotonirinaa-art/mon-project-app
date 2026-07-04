@@ -2,8 +2,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   MessageSquare, Send, Trash2, RefreshCw,
-  Phone, PhoneOff, Video, VideoOff, Mic, MicOff,
-  Monitor, MonitorOff, Search, Smile, PhoneIncoming
+  Phone, Video, Search, Smile
 } from 'lucide-react'
 import { useApp } from '../context/AppContext.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -13,247 +12,16 @@ import { ini } from '../data.js'
 import { PT, useConfirm } from './shared/PageUtils.jsx'
 
 // ════════════════════════════════════════════
-//  COMMUNICATION — Messagerie + Appels Vocal & Vidéo
+//  COMMUNICATION — Messagerie d'équipe en temps réel
+// ════════════════════════════════════════════
+//  NOTE : Les appels vocaux/vidéo nécessitent un service de
+//  signalisation WebRTC (ex: Laravel Reverb, Pusher, Agora) qui
+//  n'est pas encore configuré côté backend. Les boutons d'appel
+//  sont donc affichés comme "Bientôt disponible" plutôt que
+//  simulés, en attendant cette intégration.
 // ════════════════════════════════════════════
 
-const AUTO = [
-  'Bien reçu ! 👍', 'Je vais vérifier ça.', 'OK noté, merci !',
-  "C'est noté ! On se call demain ?", "Super, merci pour l'info !",
-  "Je m'en occupe maintenant.", "Parfait, je te tiens au courant.",
-  "👌 Compris !", "Je regarde ça tout de suite.", "Merci ! 🙏"
-]
-
 const EMOJIS = ['👍', '❤️', '😂', '🎉', '🔥', '✅', '👏', '🚀', '💡', '⚡']
-
-// ─── Bannière appel actif ──────────────────────────────────────────────────
-function CallBanner({ call, onEnd }) {
-  const [elapsed, setElapsed] = useState(0)
-  useEffect(() => {
-    const t = setInterval(() => setElapsed(s => s + 1), 1000)
-    return () => clearInterval(t)
-  }, [])
-  const fmt = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
-
-  return (
-    <motion.div
-      initial={{ y: -40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -40, opacity: 0 }}
-      style={{
-        background: 'linear-gradient(135deg,rgba(0,255,136,0.1),rgba(0,200,255,0.06))',
-        border: '1px solid rgba(0,255,136,0.2)', borderRadius: 12,
-        padding: '10px 16px', marginBottom: 14,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between'
-      }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <motion.div animate={{ scale: [1, 1.25, 1] }} transition={{ duration: 1.4, repeat: Infinity }}
-          style={{ width: 8, height: 8, borderRadius: '50%', background: '#00ff88' }} />
-        <span style={{ fontFamily: 'Orbitron,sans-serif', fontWeight: 700, fontSize: 11, color: '#00ff88' }}>
-          {call.type === 'video' ? '📹' : '📞'} APPEL EN COURS
-        </span>
-        <span style={{ fontSize: 11, color: C.t2, fontFamily: 'JetBrains Mono,monospace' }}>
-          {call.with} — {fmt(elapsed)}
-        </span>
-      </div>
-      <div style={{ display: 'flex', gap: 7 }}>
-        <button onClick={() => call.toggleMic()} style={{
-          padding: '5px 10px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 10,
-          background: call.micOn ? 'rgba(0,200,255,0.15)' : 'rgba(255,45,120,0.15)',
-          color: call.micOn ? C.cyan : '#ff2d78', display: 'flex', alignItems: 'center', gap: 4
-        }}>
-          {call.micOn ? <Mic size={11} /> : <MicOff size={11} />}
-        </button>
-        {call.type === 'video' && (
-          <button onClick={() => call.toggleVideo()} style={{
-            padding: '5px 10px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 10,
-            background: call.videoOn ? 'rgba(0,200,255,0.15)' : 'rgba(255,45,120,0.15)',
-            color: call.videoOn ? C.cyan : '#ff2d78', display: 'flex', alignItems: 'center', gap: 4
-          }}>
-            {call.videoOn ? <Video size={11} /> : <VideoOff size={11} />}
-          </button>
-        )}
-        <button onClick={onEnd} style={{
-          padding: '5px 12px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 10,
-          background: 'rgba(255,45,120,0.2)', color: '#ff2d78',
-          fontFamily: 'Orbitron,sans-serif', fontWeight: 700,
-          display: 'flex', alignItems: 'center', gap: 5
-        }}>
-          <PhoneOff size={11} /> Raccrocher
-        </button>
-      </div>
-    </motion.div>
-  )
-}
-
-// ─── Modal appel entrant ───────────────────────────────────────────────────
-function IncomingCallModal({ caller, type, onAccept, onDecline }) {
-  return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 9999,
-        background: 'rgba(2,4,8,0.88)', backdropFilter: 'blur(14px)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center'
-      }}>
-      <motion.div initial={{ scale: 0.85, y: 24 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.85, y: 24 }}
-        style={{
-          background: 'linear-gradient(135deg,#0d1f35,#091426)',
-          border: '1px solid rgba(0,200,255,0.2)', borderRadius: 22,
-          padding: 36, textAlign: 'center', minWidth: 290, position: 'relative', overflow: 'hidden'
-        }}>
-        <motion.div animate={{ scale: [1, 1.5, 1], opacity: [0.25, 0, 0.25] }}
-          transition={{ duration: 2.2, repeat: Infinity }}
-          style={{
-            position: 'absolute', top: '38%', left: '50%', transform: 'translate(-50%,-50%)',
-            width: 100, height: 100, borderRadius: '50%',
-            background: type === 'video' ? 'rgba(0,200,255,0.12)' : 'rgba(0,255,136,0.12)'
-          }} />
-        <div style={{
-          width: 70, height: 70, borderRadius: 18, margin: '0 auto 16px',
-          background: 'linear-gradient(135deg,#00c8ff,#7c3aed)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 24, fontFamily: 'Orbitron,sans-serif', fontWeight: 700, color: '#020408',
-          position: 'relative', zIndex: 1
-        }}>
-          {ini(caller)}
-        </div>
-        <p style={{ fontSize: 9, fontFamily: 'Orbitron,sans-serif', fontWeight: 700, color: C.t3, marginBottom: 6 }}>
-          {type === 'video' ? '📹 APPEL VIDÉO ENTRANT' : '📞 APPEL VOCAL ENTRANT'}
-        </p>
-        <p style={{ fontSize: 17, fontFamily: 'Orbitron,sans-serif', fontWeight: 800, color: C.t1, marginBottom: 4 }}>
-          {caller}
-        </p>
-        <motion.p animate={{ opacity: [1, 0.4, 1] }} transition={{ duration: 1.2, repeat: Infinity }}
-          style={{ fontSize: 11, color: C.t3, marginBottom: 28 }}>
-          vous appelle...
-        </motion.p>
-        <div style={{ display: 'flex', gap: 16, justifyContent: 'center' }}>
-          <button onClick={onDecline} style={{
-            width: 54, height: 54, borderRadius: '50%', border: 'none', cursor: 'pointer',
-            background: 'linear-gradient(135deg,#ff2d78,#cc1a55)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 0 22px rgba(255,45,120,0.45)'
-          }}>
-            <PhoneOff size={21} color="#fff" />
-          </button>
-          <button onClick={onAccept} style={{
-            width: 54, height: 54, borderRadius: '50%', border: 'none', cursor: 'pointer',
-            background: 'linear-gradient(135deg,#00ff88,#00cc66)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 0 22px rgba(0,255,136,0.45)'
-          }}>
-            {type === 'video' ? <Video size={21} color="#020408" /> : <Phone size={21} color="#020408" />}
-          </button>
-        </div>
-      </motion.div>
-    </motion.div>
-  )
-}
-
-// ─── Fenêtre vidéo plein écran ─────────────────────────────────────────────
-function VideoCallWindow({ call, onEnd, onToggleMic, onToggleVideo, onToggleScreen }) {
-  const [elapsed, setElapsed] = useState(0)
-  useEffect(() => {
-    const t = setInterval(() => setElapsed(s => s + 1), 1000)
-    return () => clearInterval(t)
-  }, [])
-  const fmt = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
-
-  return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      style={{ position: 'fixed', inset: 0, zIndex: 1000, background: '#020408', display: 'flex', flexDirection: 'column' }}>
-      {/* Zone vidéo */}
-      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-        <div style={{
-          width: '100%', height: '100%',
-          background: 'linear-gradient(160deg,#0a1628,#0d1f35,#070e1a)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 18
-        }}>
-          {/* Avatar distant */}
-          <motion.div animate={{ scale: [1, 1.03, 1] }} transition={{ duration: 3, repeat: Infinity }}
-            style={{
-              width: 100, height: 100, borderRadius: 26,
-              background: 'linear-gradient(135deg,#00c8ff,#7c3aed)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 32, fontFamily: 'Orbitron,sans-serif', fontWeight: 800, color: '#020408',
-              boxShadow: '0 0 40px rgba(0,200,255,0.25)'
-            }}>
-            {ini(call.with)}
-          </motion.div>
-          <p style={{ fontFamily: 'Orbitron,sans-serif', fontWeight: 700, fontSize: 15, color: C.t1 }}>
-            {call.with}
-          </p>
-          <p style={{ fontSize: 13, color: C.t3, fontFamily: 'JetBrains Mono,monospace' }}>
-            {fmt(elapsed)}
-          </p>
-        </div>
-
-        {/* Miniature self */}
-        <div style={{
-          position: 'absolute', bottom: 18, right: 18,
-          width: 130, height: 84, borderRadius: 11,
-          background: 'linear-gradient(135deg,#1a2a40,#0d1f35)',
-          border: `2px solid ${C.border}`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center'
-        }}>
-          <p style={{ fontSize: 9, color: C.t3, fontFamily: 'Orbitron,sans-serif' }}>
-            {call.videoOn ? 'VOUS' : '📷 OFF'}
-          </p>
-        </div>
-
-        {/* Info top */}
-        <div style={{ position: 'absolute', top: 18, left: 18, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <motion.div animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 1.5, repeat: Infinity }}
-            style={{ width: 8, height: 8, borderRadius: '50%', background: '#00ff88' }} />
-          <span style={{ fontFamily: 'Orbitron,sans-serif', fontWeight: 700, fontSize: 12, color: C.t1 }}>
-            {call.with}
-          </span>
-          {call.screenOn && (
-            <span style={{
-              fontSize: 9, fontFamily: 'Orbitron,sans-serif', fontWeight: 700,
-              padding: '2px 7px', borderRadius: 4, background: 'rgba(0,200,255,0.15)', color: C.cyan
-            }}>
-              PARTAGE ÉCRAN
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Barre contrôles */}
-      <div style={{
-        padding: '18px 24px', background: 'rgba(0,0,0,0.85)',
-        backdropFilter: 'blur(20px)', borderTop: `1px solid ${C.border}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14
-      }}>
-        {[
-          { icon: call.micOn ? Mic : MicOff, action: onToggleMic, active: call.micOn, label: 'Micro' },
-          { icon: call.videoOn ? Video : VideoOff, action: onToggleVideo, active: call.videoOn, label: 'Caméra' },
-          { icon: call.screenOn ? Monitor : MonitorOff, action: onToggleScreen, active: call.screenOn, label: 'Écran' },
-        ].map(({ icon: Icon, action, active, label }) => (
-          <div key={label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
-            <button onClick={action} style={{
-              width: 50, height: 50, borderRadius: '50%', border: 'none', cursor: 'pointer',
-              background: active ? 'rgba(0,200,255,0.18)' : 'rgba(255,255,255,0.07)',
-              color: active ? C.cyan : C.t2,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s'
-            }}>
-              <Icon size={19} />
-            </button>
-            <span style={{ fontSize: 9, color: C.t3, fontFamily: 'Orbitron,sans-serif' }}>{label}</span>
-          </div>
-        ))}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
-          <button onClick={onEnd} style={{
-            width: 54, height: 54, borderRadius: '50%', border: 'none', cursor: 'pointer',
-            background: 'linear-gradient(135deg,#ff2d78,#cc1a55)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 0 22px rgba(255,45,120,0.4)'
-          }}>
-            <PhoneOff size={22} color="#fff" />
-          </button>
-          <span style={{ fontSize: 9, color: '#ff2d78', fontFamily: 'Orbitron,sans-serif' }}>Raccrocher</span>
-        </div>
-      </div>
-    </motion.div>
-  )
-}
 
 // ─── Page principale ───────────────────────────────────────────────────────
 export function Communication() {
@@ -272,11 +40,6 @@ export function Communication() {
   const [msgSearch, setMsgSearch] = useState('')
   const [showMsgSearch, setShowMsgSearch] = useState(false)
 
-  // États appels
-  const [activeCall, setActiveCall] = useState(null)
-  const [incomingCall, setIncomingCall] = useState(null)
-  const [videoCallOpen, setVideoCallOpen] = useState(false)
-
   const msgRef = useRef(null)
   const inputRef = useRef(null)
 
@@ -293,6 +56,24 @@ export function Communication() {
   useEffect(() => { load() }, [load])
   useEffect(() => { msgRef.current?.scrollTo(0, msgRef.current.scrollHeight) }, [msgs.length])
 
+  // ── Auto-refresh polling (5s) ─────────────────────────────────────────
+  const pollRef = useRef(null)
+  const lastMsgId = useRef(null)
+  useEffect(() => {
+    pollRef.current = setInterval(async () => {
+      try {
+        const m = await getChat('general')
+        if (!m || !m.length) return
+        const latest = m[m.length - 1]?.id
+        if (latest && latest !== lastMsgId.current) {
+          lastMsgId.current = latest
+          setMsgs(m)
+        }
+      } catch { /* ignore silently */ }
+    }, 5000)
+    return () => clearInterval(pollRef.current)
+  }, [getChat])
+
   // ── Envoi message ───────────────────────────────────────────────────────
   const send = async () => {
     if (!input.trim() || sending) return
@@ -303,83 +84,24 @@ export function Communication() {
     try {
       await addMsg({ msg: txt })
       await load()
-      setTimeout(async () => {
-        const contact = contacts[ai]
-        if (contact) {
-          await addMsg({ msg: AUTO[Math.floor(Math.random() * AUTO.length)], sender: contact.name })
-          await load()
-        }
-      }, 1200 + Math.random() * 800)
-    } catch { showToast("Erreur d'envoi", 'danger'); setInput(txt) }
-    finally { setSending(false) }
+    } catch {
+      showToast("Erreur d'envoi", 'danger')
+      setInput(txt)
+    } finally {
+      setSending(false)
+    }
   }
 
   const handleClear = async () => {
     const ok = await confirm('Vider le chat ? Tous les messages seront supprimés.')
     if (!ok) return
-    clearChat(); load(); showToast('Chat vidé', 'success')
-  }
-
-  // ── Logique appels ──────────────────────────────────────────────────────
-  const buildCall = (type, withName) => ({
-    type, with: withName,
-    micOn: true,
-    videoOn: type === 'video',
-    screenOn: false,
-    toggleMic: () => setActiveCall(c => c ? { ...c, micOn: !c.micOn } : c),
-    toggleVideo: () => setActiveCall(c => c ? { ...c, videoOn: !c.videoOn } : c),
-  })
-
-  const startCall = (type) => {
-    if (activeCall) { showToast('Un appel est déjà en cours', 'warning'); return }
-    const contactName = ai === -1 ? 'Équipe' : contacts[ai]?.name || 'Contact'
-    if (ai === -1 && type === 'video') {
-      showToast('Appel vidéo disponible en message direct uniquement', 'warning'); return
+    try {
+      await clearChat()
+      await load()
+      showToast('Chat vidé', 'success')
+    } catch {
+      showToast('Erreur lors du vidage', 'danger')
     }
-    // Simulation : 50% chance appel entrant (UX démo)
-    if (ai !== -1 && Math.random() > 0.5) {
-      setIncomingCall({ caller: contactName, type })
-    } else {
-      const call = buildCall(type, contactName)
-      setActiveCall(call)
-      if (type === 'video') setVideoCallOpen(true)
-      showToast(`${type === 'video' ? '📹 Vidéo' : '📞 Vocal'} — ${contactName}`, 'success')
-      addMsg({ msg: `📞 Appel ${type === 'video' ? 'vidéo' : 'vocal'} initié avec ${contactName}`, sender: 'Système', type: 'system' })
-      load()
-    }
-  }
-
-  const endCall = () => {
-    const dur = Math.floor(Math.random() * 200 + 30)
-    const m = Math.floor(dur / 60), s = dur % 60
-    showToast(`Appel terminé — ${m}m${s}s`, 'info')
-    if (activeCall) {
-      addMsg({ msg: `📞 Appel terminé (${m}m${s}s)`, sender: 'Système', type: 'system' })
-      load()
-    }
-    setActiveCall(null)
-    setVideoCallOpen(false)
-  }
-
-  const toggleMic = () => setActiveCall(c => c ? { ...c, micOn: !c.micOn } : c)
-  const toggleVideo = () => setActiveCall(c => c ? { ...c, videoOn: !c.videoOn } : c)
-  const toggleScreen = () => {
-    setActiveCall(c => {
-      if (!c) return c
-      showToast(c.screenOn ? "Partage d'écran arrêté" : "Partage d'écran activé", 'info')
-      return { ...c, screenOn: !c.screenOn }
-    })
-  }
-
-  const acceptIncoming = () => {
-    const { caller, type } = incomingCall
-    setIncomingCall(null)
-    const call = buildCall(type, caller)
-    setActiveCall(call)
-    if (type === 'video') setVideoCallOpen(true)
-    showToast(`Appel accepté avec ${caller}`, 'success')
-    addMsg({ msg: `📞 Appel ${type === 'video' ? 'vidéo' : 'vocal'} avec ${caller}`, sender: 'Système', type: 'system' })
-    load()
   }
 
   // Filtres
@@ -396,46 +118,14 @@ export function Communication() {
     <div>
       {Dialog}
 
-      {/* Modal appel entrant */}
-      <AnimatePresence>
-        {incomingCall && (
-          <IncomingCallModal
-            caller={incomingCall.caller}
-            type={incomingCall.type}
-            onAccept={acceptIncoming}
-            onDecline={() => { setIncomingCall(null); showToast('Appel refusé', 'warning') }}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Fenêtre vidéo plein écran */}
-      <AnimatePresence>
-        {videoCallOpen && activeCall?.type === 'video' && (
-          <VideoCallWindow
-            call={activeCall}
-            onEnd={endCall}
-            onToggleMic={toggleMic}
-            onToggleVideo={toggleVideo}
-            onToggleScreen={toggleScreen}
-          />
-        )}
-      </AnimatePresence>
-
       {/* En-tête */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14, marginBottom: 16 }}>
         <div>
           {PT('COMMUNICATION')}
-          <p style={{ color: C.t2, fontSize: 13, marginTop: 4 }}>Messagerie & appels d'équipe en temps réel</p>
+          <p style={{ color: C.t2, fontSize: 13, marginTop: 4 }}>Messagerie d'équipe en temps réel</p>
         </div>
         <button onClick={load} style={S.btnGhost}><RefreshCw size={13} /></button>
       </div>
-
-      {/* Bannière appel actif (vocal uniquement — vidéo = plein écran) */}
-      <AnimatePresence>
-        {activeCall && !videoCallOpen && (
-          <CallBanner call={activeCall} onEnd={endCall} />
-        )}
-      </AnimatePresence>
 
       {/* Corps principal */}
       <div style={{ ...S.panel({ padding: 0, overflow: 'hidden', display: 'flex', height: 580 }) }}>
@@ -515,21 +205,6 @@ export function Communication() {
                     </p>
                     <p style={{ fontSize: 9, color: C.t3 }}>{u.role}</p>
                   </div>
-                  {/* Boutons appel rapide si contact sélectionné */}
-                  {isSelected && (
-                    <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
-                      <button onClick={e => { e.stopPropagation(); startCall('audio') }}
-                        style={{ background: 'none', border: 'none', color: '#00ff88', cursor: 'pointer', padding: 3, borderRadius: 4 }}
-                        title="Appel vocal">
-                        <Phone size={11} />
-                      </button>
-                      <button onClick={e => { e.stopPropagation(); startCall('video') }}
-                        style={{ background: 'none', border: 'none', color: C.cyan, cursor: 'pointer', padding: 3, borderRadius: 4 }}
-                        title="Appel vidéo">
-                        <Video size={11} />
-                      </button>
-                    </div>
-                  )}
                 </button>
               )
             })}
@@ -587,27 +262,24 @@ export function Communication() {
                 <Search size={13} />
               </button>
 
-              {/* Bouton appel vocal */}
-              <button onClick={() => startCall('audio')} disabled={!!activeCall}
+              {/* Appels — désactivés tant que la signalisation WebRTC n'est pas configurée côté backend */}
+              <button disabled title="Appel vocal — bientôt disponible (configuration WebRTC requise)"
                 style={{
-                  padding: '5px 11px', borderRadius: 7, border: `1px solid ${activeCall ? C.border : 'rgba(0,255,136,0.25)'}`,
-                  background: activeCall ? 'none' : 'rgba(0,255,136,0.08)',
-                  color: activeCall ? C.t3 : '#00ff88', cursor: activeCall ? 'not-allowed' : 'pointer',
+                  padding: '5px 11px', borderRadius: 7, border: `1px solid ${C.border}`,
+                  background: 'none', color: C.t3, cursor: 'not-allowed',
                   fontSize: 10, fontFamily: 'Orbitron,sans-serif', fontWeight: 700,
-                  display: 'flex', alignItems: 'center', gap: 5, opacity: activeCall ? 0.4 : 1, transition: 'all 0.2s'
+                  display: 'flex', alignItems: 'center', gap: 5, opacity: 0.4
                 }}>
                 <Phone size={12} /> Vocal
               </button>
 
-              {/* Bouton appel vidéo (DM uniquement) */}
               {ai !== -1 && (
-                <button onClick={() => startCall('video')} disabled={!!activeCall}
+                <button disabled title="Appel vidéo — bientôt disponible (configuration WebRTC requise)"
                   style={{
-                    padding: '5px 11px', borderRadius: 7, border: `1px solid ${activeCall ? C.border : 'rgba(0,200,255,0.25)'}`,
-                    background: activeCall ? 'none' : 'rgba(0,200,255,0.08)',
-                    color: activeCall ? C.t3 : C.cyan, cursor: activeCall ? 'not-allowed' : 'pointer',
+                    padding: '5px 11px', borderRadius: 7, border: `1px solid ${C.border}`,
+                    background: 'none', color: C.t3, cursor: 'not-allowed',
                     fontSize: 10, fontFamily: 'Orbitron,sans-serif', fontWeight: 700,
-                    display: 'flex', alignItems: 'center', gap: 5, opacity: activeCall ? 0.4 : 1, transition: 'all 0.2s'
+                    display: 'flex', alignItems: 'center', gap: 5, opacity: 0.4
                   }}>
                   <Video size={12} /> Vidéo
                 </button>

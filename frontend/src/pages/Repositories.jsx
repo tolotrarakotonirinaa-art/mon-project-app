@@ -3,7 +3,7 @@ import {motion,AnimatePresence} from 'framer-motion'
 import {
   FolderOpen,Plus,Trash2,Download,Upload,
   RefreshCw,Search,X,FileText,FileImage,
-  FileArchive,File,Eye,Clock,HardDrive
+  FileArchive,File,Eye,Clock,HardDrive,Code,Globe,Database
 } from 'lucide-react'
 import {useApp} from '../context/AppContext.jsx'
 import {useAuth} from '../context/AuthContext.jsx'
@@ -23,22 +23,34 @@ function formatSize(bytes){
 
 function getFileIcon(filename){
   const ext=(filename||'').split('.').pop()?.toLowerCase()
-  if(['jpg','jpeg','png','gif','svg','webp'].includes(ext)) return {icon:FileImage, color:C.cyan}
-  if(['pdf'].includes(ext))                                  return {icon:FileText,  color:'#ff6b6b'}
-  if(['zip','rar','tar','gz','7z'].includes(ext))            return {icon:FileArchive,color:C.solar}
-  if(['doc','docx','xls','xlsx','ppt','pptx'].includes(ext)) return {icon:FileText,  color:C.plasma}
-  return {icon:File, color:C.t2}
+  if(['js','jsx','ts','tsx','mjs','cjs'].includes(ext))              return {icon:Code,       color:'#f7df1e'}
+  if(['html','htm','css','scss','sass','less'].includes(ext))         return {icon:Globe,      color:'#38bdf8'}
+  if(['php','py','rb','java','go','rs','cs','cpp','c','kt','swift'].includes(ext)) return {icon:Code, color:'#a78bfa'}
+  if(['json','yaml','yml','xml','env','toml','ini','sql','prisma','graphql'].includes(ext)) return {icon:Database,color:'#fb923c'}
+  if(['sh','bash','zsh','md','mdx','txt','log','csv','lock'].includes(ext)) return {icon:FileText,color:'#94a3b8'}
+  if(['jpg','jpeg','png','gif','svg','webp','ico','bmp'].includes(ext)) return {icon:FileImage,color:'#34d399'}
+  if(['pdf'].includes(ext))                                            return {icon:FileText,  color:'#ff6b6b'}
+  if(['zip','rar','tar','gz','7z'].includes(ext))                      return {icon:FileArchive,color:'#f472b6'}
+  if(['doc','docx','xls','xlsx','ppt','pptx'].includes(ext))           return {icon:FileText,  color:'#2b7fff'}
+  return {icon:File, color:'#94a3b8'}
 }
 
 function getFileType(filename){
   const ext=(filename||'').split('.').pop()?.toLowerCase()
-  if(['jpg','jpeg','png','gif','svg','webp'].includes(ext)) return 'Image'
-  if(['pdf'].includes(ext))                                  return 'PDF'
-  if(['zip','rar','tar','gz','7z'].includes(ext))            return 'Archive'
-  if(['doc','docx'].includes(ext))                           return 'Word'
-  if(['xls','xlsx'].includes(ext))                           return 'Excel'
-  if(['ppt','pptx'].includes(ext))                           return 'PowerPoint'
-  return ext?.toUpperCase()||'Fichier'
+  const map={
+    js:'JavaScript',jsx:'React JSX',ts:'TypeScript',tsx:'React TSX',mjs:'ESModule',cjs:'CommonJS',
+    html:'HTML',htm:'HTML',css:'CSS',scss:'SCSS',sass:'SASS',less:'LESS',
+    php:'PHP',py:'Python',rb:'Ruby',java:'Java',go:'Go',rs:'Rust',
+    cs:'C#',cpp:'C++',c:'C',kt:'Kotlin',swift:'Swift',
+    json:'JSON',yaml:'YAML',yml:'YAML',xml:'XML',env:'.env',
+    toml:'TOML',ini:'INI',sql:'SQL',prisma:'Prisma',graphql:'GraphQL',
+    sh:'Shell',bash:'Bash',zsh:'Zsh',md:'Markdown',mdx:'MDX',
+    jpg:'Image',jpeg:'Image',png:'Image',gif:'GIF',svg:'SVG',webp:'WebP',ico:'Icône',
+    pdf:'PDF',zip:'ZIP',rar:'RAR',tar:'TAR',gz:'GZIP',
+    doc:'Word',docx:'Word',xls:'Excel',xlsx:'Excel',ppt:'PowerPoint',pptx:'PowerPoint',
+    txt:'Texte',csv:'CSV',log:'Log',lock:'Lock',
+  }
+  return map[ext]||ext?.toUpperCase()||'Fichier'
 }
 
 // ─────────────────────────────────────────────────────────
@@ -154,9 +166,24 @@ function UploadForm({onSave,onClose,saving}){
   const inputRef=useRef()
 
   const MAX_MB=50
-  const ALLOWED=['pdf','doc','docx','xls','xlsx','ppt','pptx',
-                 'jpg','jpeg','png','gif','svg','webp',
-                 'zip','rar','tar','gz','7z','txt','csv','json','xml']
+  const ALLOWED=[
+    // Office & PDF
+    'pdf','doc','docx','xls','xlsx','ppt','pptx',
+    // Images
+    'jpg','jpeg','png','gif','svg','webp','ico','bmp',
+    // Archives
+    'zip','rar','tar','gz','7z',
+    // JS / TS
+    'js','jsx','ts','tsx','mjs','cjs',
+    // Web
+    'html','htm','css','scss','sass','less',
+    // Backend
+    'php','py','rb','java','go','rs','cs','cpp','c','h','kt','swift',
+    // Data & Config
+    'json','yaml','yml','xml','env','toml','ini','sql','prisma','graphql',
+    // Autres
+    'txt','csv','md','mdx','sh','bash','zsh','log','lock',
+  ]
 
   const validate=(f)=>{
     if(!f) return 'Veuillez sélectionner un fichier'
@@ -272,8 +299,12 @@ export function Repositories(){
   }
 
   const TYPE_GROUPS={
-    image:  ['jpg','jpeg','png','gif','svg','webp'],
-    doc:    ['pdf','doc','docx','xls','xlsx','ppt','pptx'],
+    dev:    ['js','jsx','ts','tsx','mjs','cjs','html','htm','css','scss','sass','less',
+             'php','py','rb','java','go','rs','cs','cpp','c','h','kt','swift',
+             'json','yaml','yml','xml','env','toml','ini','sql','prisma','graphql',
+             'sh','bash','zsh','md','mdx','log','lock'],
+    image:  ['jpg','jpeg','png','gif','svg','webp','ico','bmp'],
+    doc:    ['pdf','doc','docx','xls','xlsx','ppt','pptx','txt','csv'],
     archive:['zip','rar','tar','gz','7z'],
   }
 
@@ -339,7 +370,7 @@ export function Repositories(){
             </button>
           )}
         </div>
-        {[{v:'all',l:'Tous'},{v:'doc',l:'📄 Documents'},{v:'image',l:'🖼️ Images'},{v:'archive',l:'📦 Archives'}]
+        {[{v:'all',l:'Tous'},{v:'dev',l:'⚡ Dev'},{v:'doc',l:'📄 Documents'},{v:'image',l:'🖼️ Images'},{v:'archive',l:'📦 Archives'}]
           .map(({v,l})=>(
           <button key={v} onClick={()=>setFilter(v)}
             style={{padding:'7px 14px',borderRadius:8,cursor:'pointer',

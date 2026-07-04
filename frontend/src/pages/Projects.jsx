@@ -265,14 +265,17 @@ function ProjectForm({project,onSave,onClose,allUsers}){
 
   const submit=()=>{
     if(!validate()) return
+    const respUser=allUsers.find(u=>String(u.id)===String(f.responsable_id))
     onSave({
       ...f,
       technologies:Array.isArray(f.technologies)?f.technologies:parseTechs(f.technologies),
-      team_ids:teamIds,
-      // compatibilité backend : responsable = nom du responsable
-      responsable:allUsers.find(u=>u.id===f.responsable_id)?.name||f.responsable||'',
+      team_ids:teamIds.map(id=>parseInt(id)).filter(Boolean),
+      responsable_id:f.responsable_id?parseInt(f.responsable_id):null,
+      responsable:respUser?.name||f.responsable||'',
+      start_date:f.start_date||null,
+      end_date:f.end_date||null,
+      progress:parseInt(f.progress)||0,
     })
-    onClose()
   }
 
   return(
@@ -926,17 +929,37 @@ export default function Projects(){
     try{
       if(modal.type==='add'){
         const res=await addProject(data)
-        // Optimistic
-        setProjects(prev=>[...prev,{...data,id:res?.id||Date.now(),_autoStatus:computeProjectStatus(data)}])
+        if(!res?.success){
+          const msg=res?.message||
+            Object.values(res?.errors||{}).flat().join(' | ')||
+            'Erreur création'
+          showToast(msg,'danger')
+          return
+        }
+        const newProject=res.data||res.project||res
+        setProjects(prev=>[...prev,{...newProject,_autoStatus:computeProjectStatus(newProject)}])
         showToast('Projet créé !','success')
+        setModal(null)
+        load()
       }else{
-        await updateProject(modal.p.id,data)
-        setProjects(prev=>prev.map(p=>p.id===modal.p.id?{...p,...data,_autoStatus:computeProjectStatus(data)}:p))
+        const res=await updateProject(modal.p.id,data)
+        if(!res?.success){
+          const msg=res?.message||
+            Object.values(res?.errors||{}).flat().join(' | ')||
+            'Erreur mise à jour'
+          showToast(msg,'danger')
+          return
+        }
+        const updated=res.data||res.project||{...modal.p,...data}
+        setProjects(prev=>prev.map(p=>p.id===modal.p.id?{...updated,_autoStatus:computeProjectStatus(updated)}:p))
         showToast('Projet mis à jour !','success')
+        setModal(null)
+        load()
       }
-      setModal(null)
+    }catch(e){
+      showToast(e?.message||'Erreur lors de la sauvegarde','danger')
       load()
-    }catch(e){showToast(e?.message||'Erreur lors de la sauvegarde','danger')}
+    }
   }
 
   const handleDelete=async id=>{

@@ -3,6 +3,8 @@
 //  Mode STRICT : le backend Laravel est obligatoire
 // ────────────────────────────────────────────────────────
 
+import {recordApiCall} from '../utils/perfMonitor.js'
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
 
 export let serverStatus = {
@@ -35,12 +37,13 @@ export async function checkServer(){
 
 async function request(method, endpoint, body=null, timeout=15000){
   const token = localStorage.getItem('dv4_token')
+  const startedAt = performance.now()
 
   const options = {
     method,
     headers: {
-      'Content-Type': 'application/json',
-      'Accept':       'application/json',
+      'Accept': 'application/json',
+      ...(method !== 'GET' ? {'Content-Type': 'application/json'} : {}),
     },
     signal: AbortSignal.timeout(timeout),
   }
@@ -50,6 +53,7 @@ async function request(method, endpoint, body=null, timeout=15000){
 
   try {
     const res = await fetch(`${API_URL}${endpoint}`, options)
+    recordApiCall(endpoint, performance.now() - startedAt)
     serverStatus.online = true
 
     if(res.status === 401){
@@ -60,10 +64,11 @@ async function request(method, endpoint, body=null, timeout=15000){
     }
 
     const data = await res.json()
-    data.status = res.status
+    data._status = res.status
     return data
 
   } catch(err) {
+    recordApiCall(endpoint, performance.now() - startedAt)
     if(err?.name === 'TimeoutError'){
       return {
         success: false,

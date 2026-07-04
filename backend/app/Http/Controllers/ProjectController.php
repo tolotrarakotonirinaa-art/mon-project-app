@@ -36,7 +36,6 @@ class ProjectController extends BaseController
 
         $projects = $query->orderBy('created_at', 'desc')->get();
 
-        // ← Statut automatique selon dates
         $projects = $projects->map(fn($p) => $this->withAutoStatus($p));
 
         return $this->success($projects);
@@ -63,17 +62,20 @@ class ProjectController extends BaseController
 
         $request->validate([
             'name'            => 'required|string|min:2|max:120',
-            'description'     => 'sometimes|string',
-            'objectifs'       => 'sometimes|string',
-            'technologies'    => 'sometimes',
-            'responsable'     => 'sometimes|string|max:120',
+            'description'     => 'sometimes|nullable|string',
+            'objectifs'       => 'sometimes|nullable|string',
+            'technologies'    => 'sometimes|nullable',
+            'responsable'     => 'sometimes|nullable|string|max:120',
+            'responsable_id'  => 'sometimes|nullable|integer|exists:users,id',
             'status'          => 'sometimes|in:active,pending,completed',
-            'color'           => 'sometimes|string',
+            'color'           => 'sometimes|nullable|string',
             'start_date'      => 'sometimes|nullable|date',
-            'end_date'        => 'sometimes|nullable|date',
-            'tags'            => 'sometimes|array',
+            'end_date'        => 'sometimes|nullable|date|after_or_equal:start_date',
+            'tags'            => 'sometimes|nullable|array',
             'progress'        => 'sometimes|integer|min:0|max:100',
             'progress_manuel' => 'sometimes|boolean',
+            'team_ids'        => 'sometimes|nullable|array',
+            'team_ids.*'      => 'integer|exists:users,id',
         ]);
 
         $user = $this->authUser($request);
@@ -81,24 +83,39 @@ class ProjectController extends BaseController
         // Technologies — accepte array ou string
         $techs = $request->input('technologies', []);
         if (is_array($techs)) {
-            $techs = implode(',', $techs);
+            $techs = implode(',', array_filter($techs, fn($t) => trim($t) !== ''));
+        }
+
+        // team_ids — creator toujours inclus
+        $teamIds = $request->input('team_ids', []);
+        $teamIds = array_map('intval', array_filter($teamIds));
+        if (!in_array((int)$user['id'], $teamIds)) {
+            $teamIds[] = (int)$user['id'];
+        }
+        $teamIds = array_values(array_unique($teamIds));
+
+        // responsable — toujours string, jamais null
+        $responsable = $request->input('responsable') ?: '';
+        if ($responsable === '' && $request->filled('responsable_id')) {
+            $respUser    = User::find($request->input('responsable_id'));
+            $responsable = $respUser?->name ?? '';
         }
 
         $p = Project::create([
-            'name'            => $request->name,
-            'description'     => $request->input('description', ''),
-            'objectifs'       => $request->input('objectifs', ''),
+            'name'            => trim($request->name),
+            'description'     => $request->input('description', '') ?? '',
+            'objectifs'       => $request->input('objectifs', '') ?? '',
             'technologies'    => $techs,
-            'responsable'     => $request->input('responsable', ''),
+            'responsable'     => $responsable,
             'status'          => $request->input('status', 'active'),
-            'progress'        => $request->input('progress', 0),
-            'progress_manuel' => $request->input('progress_manuel', false),
+            'progress'        => (int) $request->input('progress', 0),
+            'progress_manuel' => (bool) $request->input('progress_manuel', false),
             'start_date'      => $request->input('start_date') ?: now()->toDateString(),
-            'end_date'        => $request->input('end_date'),
+            'end_date'        => $request->input('end_date') ?: null,
             'color'           => $request->input('color', '#00c8ff'),
-            'team'            => [$user['id']],
-            'tags'            => $request->input('tags', []),
-            'created_by'      => $user['id'],
+            'team'            => $teamIds,
+            'tags'            => $request->input('tags', []) ?? [],
+            'created_by'      => (int) $user['id'],
         ]);
 
         return $this->created($this->withAutoStatus($p), 'Projet créé avec succès');
@@ -121,15 +138,52 @@ class ProjectController extends BaseController
             return $this->forbidden("Vous n'avez pas accès à ce projet");
         }
 
+        $request->validate([
+            'name'            => 'sometimes|required|string|min:2|max:120',
+            'description'     => 'sometimes|nullable|string',
+            'objectifs'       => 'sometimes|nullable|string',
+            'technologies'    => 'sometimes|nullable',
+            'responsable'     => 'sometimes|nullable|string|max:120',
+            'responsable_id'  => 'sometimes|nullable|integer|exists:users,id',
+            'status'          => 'sometimes|in:active,pending,completed',
+            'color'           => 'sometimes|nullable|string',
+            'start_date'      => 'sometimes|nullable|date',
+            'end_date'        => 'sometimes|nullable|date',
+            'tags'            => 'sometimes|nullable|array',
+            'progress'        => 'sometimes|integer|min:0|max:100',
+            'progress_manuel' => 'sometimes|boolean',
+            'team_ids'        => 'sometimes|nullable|array',
+            'team_ids.*'      => 'integer|exists:users,id',
+        ]);
+
         // Technologies — normaliser
         if ($request->has('technologies')) {
             $techs = $request->input('technologies');
             if (is_array($techs)) {
-                $request->merge(['technologies' => implode(',', $techs)]);
+                $techs = implode(',', array_filter($techs, fn($t) => trim($t) !== ''));
             }
+            $request->merge(['technologies' => $techs]);
         }
 
-        // Raha manova progress manuellement → progress_manuel = true
+        // team_ids → team
+        if ($request->has('team_ids')) {
+            $teamIds = array_map('intval', array_filter($request->input('team_ids', [])));
+            $teamIds = array_values(array_unique($teamIds));
+            $request->merge(['team' => $teamIds]);
+        }
+
+        // responsable depuis responsable_id si besoin
+        if ($request->has('responsable_id') && !$request->filled('responsable')) {
+            $respUser = User::find($request->input('responsable_id'));
+            $request->merge(['responsable' => $respUser?->name ?? '']);
+        }
+
+        // responsable jamais null
+        if ($request->has('responsable') && is_null($request->input('responsable'))) {
+            $request->merge(['responsable' => '']);
+        }
+
+        // progress manuel auto
         if ($request->filled('progress') && !$request->has('progress_manuel')) {
             $request->merge(['progress_manuel' => true]);
         }
@@ -144,8 +198,7 @@ class ProjectController extends BaseController
     }
 
     // ─────────────────────────────────────────────────────
-    //  RECALCULATE PROGRESS — Automatique avy amin'ny tâches
-    //  ← NAOVANA: mampiasa status='done' fa tsy terminee
+    //  RECALCULATE PROGRESS
     // ─────────────────────────────────────────────────────
     public function recalculateProgress(Request $request, int $id): JsonResponse
     {
@@ -154,7 +207,7 @@ class ProjectController extends BaseController
 
         $total = Task::where('project_id', $id)->count();
         $done  = Task::where('project_id', $id)
-                     ->where('status', 'done')   // ← marina: status=done
+                     ->where('status', 'done')
                      ->count();
 
         $progress = $total === 0 ? 0 : (int) round(($done / $total) * 100);
@@ -204,7 +257,7 @@ class ProjectController extends BaseController
                 'total'    => $tasks->count(),
                 'done'     => $done,
                 'restante' => $tasks->count() - $done,
-                'overdue'  => $tasks->where('status','overdue')->count(),
+                'overdue'  => $tasks->where('status', 'overdue')->count(),
             ],
         ]);
     }
@@ -214,10 +267,10 @@ class ProjectController extends BaseController
     // ─────────────────────────────────────────────────────
     private function withAutoStatus(Project $p): array
     {
-        $data   = $p->toArray();
-        $now    = now();
-        $start  = $p->start_date;
-        $end    = $p->end_date;
+        $data  = $p->toArray();
+        $now   = now();
+        $start = $p->start_date;
+        $end   = $p->end_date;
 
         if ($p->status === 'completed') {
             $data['auto_status'] = 'completed';
@@ -229,12 +282,25 @@ class ProjectController extends BaseController
             $data['auto_status'] = 'active';
         }
 
-        // Technologies en array toujours
-        if (isset($data['technologies']) && is_string($data['technologies'])) {
-            $data['technologies'] = array_filter(
-                explode(',', $data['technologies']),
-                fn($t) => trim($t) !== ''
-            );
+        // Technologies toujours en array
+        if (isset($data['technologies'])) {
+            if (is_string($data['technologies'])) {
+                $data['technologies'] = array_values(array_filter(
+                    explode(',', $data['technologies']),
+                    fn($t) => trim($t) !== ''
+                ));
+            } elseif (!is_array($data['technologies'])) {
+                $data['technologies'] = [];
+            }
+        } else {
+            $data['technologies'] = [];
+        }
+
+        // team_ids depuis team
+        if (isset($data['team']) && is_array($data['team'])) {
+            $data['team_ids'] = $data['team'];
+        } else {
+            $data['team_ids'] = [];
         }
 
         return $data;

@@ -146,14 +146,24 @@ class DatabaseSeeder extends Seeder
         DB::table('projects')->insert($projects);
 
         // ── 3. TASKS ─────────────────────────────────────────────
+        // ✅ FIX : la colonne 'project' (string) a été supprimée par la migration
+        //    2026_06_10_074909_fix_tasks_columns. Le seeder utilisait encore
+        //    l'ancien nom de colonne ('project' => 'Site E-commerce'), ce qui
+        //    faisait planter `php artisan migrate:fresh --seed` en plein milieu
+        //    (SQLSTATE[42703]: column "project" does not exist), et empêchait
+        //    toutes les tables suivantes (repositories, environments, pipeline,
+        //    chat, activities, notifications) d'être peuplées.
+        //    -> on utilise maintenant project_id (FK vers projects.id), en
+        //    s'appuyant sur l'ordre d'insertion des projets ci-dessus :
+        //    1 = Site E-commerce, 2 = API de paiement, 3 = App Mobile, 4 = Dashboard Analytics
         $tasks = [
-            ['title' => 'Corriger bug login',     'project' => 'Site E-commerce',     'status' => 'todo',       'priority' => 'high',   'assignee' => 'JD', 'due_date' => '2024-11-10', 'description' => 'Bug sur la page de connexion mobile',  'created_by' => 1],
-            ['title' => 'Implementer API REST',   'project' => 'API de paiement',     'status' => 'inprogress', 'priority' => 'medium', 'assignee' => 'JM', 'due_date' => '2024-11-15', 'description' => 'Endpoints CRUD pour les paiements',     'created_by' => 1],
-            ['title' => 'Tests unitaires',        'project' => 'App Mobile',          'status' => 'done',       'priority' => 'low',    'assignee' => 'SL', 'due_date' => '2024-11-05', 'description' => 'Tests Jest pour les composants',        'created_by' => 1],
-            ['title' => 'Design responsive',      'project' => 'Site E-commerce',     'status' => 'todo',       'priority' => 'medium', 'assignee' => 'MD', 'due_date' => '2024-11-12', 'description' => 'Adaptation mobile/tablette',            'created_by' => 1],
-            ['title' => 'Documentation API',      'project' => 'API de paiement',     'status' => 'inprogress', 'priority' => 'low',    'assignee' => 'JD', 'due_date' => '2024-11-20', 'description' => 'Swagger + README',                     'created_by' => 1],
-            ['title' => 'Config CI/CD',           'project' => 'App Mobile',          'status' => 'todo',       'priority' => 'high',   'assignee' => 'AU', 'due_date' => '2024-11-08', 'description' => 'GitHub Actions pipeline',              'created_by' => 1],
-            ['title' => 'Optimiser requetes BDD', 'project' => 'Dashboard Analytics', 'status' => 'done',       'priority' => 'high',   'assignee' => 'JM', 'due_date' => '2024-11-01', 'description' => 'Index + cache Redis',                  'created_by' => 1],
+            ['title' => 'Corriger bug login',     'project_id' => 1, 'status' => 'todo',       'priority' => 'high',   'assignee' => 'JD', 'due_date' => '2024-11-10', 'description' => 'Bug sur la page de connexion mobile',  'created_by' => 1],
+            ['title' => 'Implementer API REST',   'project_id' => 2, 'status' => 'inprogress', 'priority' => 'medium', 'assignee' => 'JM', 'due_date' => '2024-11-15', 'description' => 'Endpoints CRUD pour les paiements',     'created_by' => 1],
+            ['title' => 'Tests unitaires',        'project_id' => 3, 'status' => 'done',       'priority' => 'low',    'assignee' => 'SL', 'due_date' => '2024-11-05', 'description' => 'Tests Jest pour les composants',        'created_by' => 1],
+            ['title' => 'Design responsive',      'project_id' => 1, 'status' => 'todo',       'priority' => 'medium', 'assignee' => 'MD', 'due_date' => '2024-11-12', 'description' => 'Adaptation mobile/tablette',            'created_by' => 1],
+            ['title' => 'Documentation API',      'project_id' => 2, 'status' => 'inprogress', 'priority' => 'low',    'assignee' => 'JD', 'due_date' => '2024-11-20', 'description' => 'Swagger + README',                     'created_by' => 1],
+            ['title' => 'Config CI/CD',           'project_id' => 3, 'status' => 'todo',       'priority' => 'high',   'assignee' => 'AU', 'due_date' => '2024-11-08', 'description' => 'GitHub Actions pipeline',              'created_by' => 1],
+            ['title' => 'Optimiser requetes BDD', 'project_id' => 4, 'status' => 'done',       'priority' => 'high',   'assignee' => 'JM', 'due_date' => '2024-11-01', 'description' => 'Index + cache Redis',                  'created_by' => 1],
         ];
         foreach ($tasks as &$t) {
             $t['created_at'] = now();

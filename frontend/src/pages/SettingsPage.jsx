@@ -5,6 +5,7 @@ import {useApp} from '../context/AppContext.jsx'
 import {useAuth} from '../context/AuthContext.jsx'
 import {PanelHeader} from '../components/ui/UI.jsx'
 import {C,S,ROLE_META} from '../styles.js'
+import ThemePicker from '../components/ui/ThemePicker.jsx'
 import {ini} from '../data.js'
 import {PT} from './shared/PageUtils.jsx'
 
@@ -250,32 +251,9 @@ export function SettingsPage(){
 
             {tab==='theme'&&(
               <motion.div key="t" initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0}}>
-                <h3 style={{fontFamily:'Orbitron,sans-serif',fontWeight:700,fontSize:15,color:C.t1,marginBottom:18}}>Apparence</h3>
-                <div style={{marginBottom:20}}>
-                  <p style={{fontSize:12,color:C.t2,marginBottom:11}}>Couleur d'accent de l'interface</p>
-                  <div style={{display:'flex',gap:10}}>
-                    {[C.cyan,C.plasma,C.neon,C.solar,C.nova,C.quantum].map(c=>(
-                      <button key={c} type="button" onClick={()=>{setAccentColor(c);showToast('Couleur appliquée !','success')}}
-                        style={{width:36,height:36,borderRadius:9,background:c,
-                          border:`2.5px solid ${accentColor===c?'#fff':'transparent'}`,cursor:'pointer',
-                          boxShadow:accentColor===c?`0 0 12px ${c}`:'none',transition:'all 0.15s'}}/>
-                    ))}
-                  </div>
-                </div>
-                <div style={{padding:'12px 14px',background:'rgba(0,200,255,0.04)',
-                  border:`1px solid ${C.border}`,borderRadius:10,marginBottom:16}}>
-                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                    <div>
-                      <p style={{fontSize:13,color:C.t1,fontFamily:'Rajdhani,sans-serif',fontWeight:600}}>Mode sombre (4D Cosmic)</p>
-                      <p style={{fontSize:11,color:C.t3,marginTop:2}}>Interface sombre optimisée pour les longues sessions</p>
-                    </div>
-                    <span style={{fontSize:9,fontFamily:'Orbitron,sans-serif',fontWeight:700,padding:'2px 9px',borderRadius:5,
-                      background:'rgba(0,200,255,0.1)',color:C.cyan,border:'1px solid rgba(0,200,255,0.2)'}}>ACTIF</span>
-                  </div>
-                </div>
-                <button onClick={()=>showToast('Thème appliqué !','success')} style={{...S.btnPlasma,fontSize:12}}>
-                  Appliquer le thème
-                </button>
+                <h3 style={{fontFamily:'Orbitron,sans-serif',fontWeight:700,fontSize:15,color:C.t1,marginBottom:6}}>Apparence</h3>
+                <p style={{fontSize:12,color:C.t3,marginBottom:20}}>Choisissez le thème de l'interface — appliqué sur toute l'application.</p>
+                <ThemePicker />
               </motion.div>
             )}
           </AnimatePresence>

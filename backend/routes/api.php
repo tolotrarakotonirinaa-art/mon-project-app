@@ -98,6 +98,35 @@ Route::middleware('jwt.auth')->group(function () {
         Route::get('/{id}/metrics', [EnvironmentController::class, 'metrics']);
     });
 
+    // DevSpace — Docker (réel)
+    Route::prefix('devspace/docker')->group(function () {
+        Route::get('/containers',              [\App\Http\Controllers\DevSpace\DockerController::class, 'index']);
+        Route::get('/stats',                    [\App\Http\Controllers\DevSpace\DockerController::class, 'stats']);
+        Route::post('/containers/{id}/start',   [\App\Http\Controllers\DevSpace\DockerController::class, 'start']);
+        Route::post('/containers/{id}/stop',    [\App\Http\Controllers\DevSpace\DockerController::class, 'stop']);
+        Route::post('/containers/{id}/restart', [\App\Http\Controllers\DevSpace\DockerController::class, 'restart']);
+        Route::get('/containers/{id}/logs',     [\App\Http\Controllers\DevSpace\DockerController::class, 'logs']);
+    });
+
+    // DevSpace — DB Query (réel, lecture seule)
+    Route::prefix('devspace/db')->group(function () {
+        Route::get('/tables',                  [\App\Http\Controllers\DevSpace\DbQueryController::class, 'tables']);
+        Route::get('/tables/{table}/columns',  [\App\Http\Controllers\DevSpace\DbQueryController::class, 'describe']);
+        Route::post('/query',                  [\App\Http\Controllers\DevSpace\DbQueryController::class, 'query']);
+    });
+
+    // DevSpace — Terminal (réel, whitelist de commandes)
+    Route::prefix('devspace/terminal')->group(function () {
+        Route::get('/allowed', [\App\Http\Controllers\DevSpace\TerminalController::class, 'allowed']);
+        Route::post('/exec',   [\App\Http\Controllers\DevSpace\TerminalController::class, 'exec']);
+    });
+
+    // DevSpace — Tests (réel, exécute vendor/bin/phpunit et parse le JUnit XML)
+    Route::prefix('devspace/tests')->group(function () {
+        Route::get('/',     [\App\Http\Controllers\DevSpace\TestRunnerController::class, 'index']);
+        Route::post('/run', [\App\Http\Controllers\DevSpace\TestRunnerController::class, 'run']);
+    });
+
     // Pipeline
     Route::prefix('pipeline')->group(function () {
         Route::get('/status',       [PipelineController::class, 'status']);

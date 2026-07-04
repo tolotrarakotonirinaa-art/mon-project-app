@@ -1,11 +1,9 @@
-import React,{useState,useEffect,useMemo,useCallback,useRef} from 'react'
+import React,{useState,useEffect,useMemo,useCallback} from 'react'
 import {motion,AnimatePresence} from 'framer-motion'
 import {
-  CheckSquare,Plus,Trash2,Edit,AlertCircle,Clock,Search,
+  CheckSquare,Plus,Trash2,Edit,Clock,Search,
   Filter,Calendar,User,Zap,X,RefreshCw,AlertTriangle,
-  PlayCircle,CheckCircle2,Circle,LayoutGrid,List,
-  ChevronsUpDown,ChevronUp,ChevronDown,Check,
-  Shield,Code,Briefcase,UserCheck,Crown
+  PlayCircle,CheckCircle2,Circle,LayoutGrid,List,Check
 } from 'lucide-react'
 import {useApp} from '../context/AppContext.jsx'
 import {useAuth} from '../context/AuthContext.jsx'
@@ -37,13 +35,12 @@ function getDaysLeft(due_date){
 //  CONSTANTES
 // ─────────────────────────────────────────────────────────
 const COLS=[
-  {id:'todo',       label:'À FAIRE',   color:'#ffce00', icon:Circle,        emoji:'📋'},
-  {id:'inprogress', label:'EN COURS',  color:'#00c8ff', icon:PlayCircle,    emoji:'⚡'},
-  {id:'overdue',    label:'EN RETARD', color:'#ff2d78', icon:AlertTriangle, emoji:'🚨'},
-  {id:'done',       label:'TERMINÉ',   color:'#00ff88', icon:CheckCircle2,  emoji:'✅'},
+  {id:'todo',       label:'À FAIRE',   color:'#ffce00', icon:Circle},
+  {id:'inprogress', label:'EN COURS',  color:'#00c8ff', icon:PlayCircle},
+  {id:'overdue',    label:'EN RETARD', color:'#ff2d78', icon:AlertTriangle},
+  {id:'done',       label:'TERMINÉ',   color:'#00ff88', icon:CheckCircle2},
 ]
 const PC={high:'#ff2d78',urgent:'#ff0000',medium:'#ffce00',low:'#7ab0d4'}
-const PL={urgent:'🔴 Urgente',high:'🔥 Haute',medium:'🔶 Moyenne',low:'🔵 Faible'}
 
 // ─────────────────────────────────────────────────────────
 //  MODAL SHELL
@@ -80,7 +77,7 @@ function MShell({title,onClose,children,wide}){
 }
 
 // ─────────────────────────────────────────────────────────
-//  AVATAR UTILISATEUR
+//  AVATAR
 // ─────────────────────────────────────────────────────────
 function UserAvatar({user,size=24}){
   if(!user) return(
@@ -103,7 +100,7 @@ function UserAvatar({user,size=24}){
 }
 
 // ─────────────────────────────────────────────────────────
-//  SKELETON KANBAN
+//  SKELETON
 // ─────────────────────────────────────────────────────────
 function SkeletonCard(){
   const p={background:`linear-gradient(90deg,${C.border}44 25%,${C.border}99 50%,${C.border}44 75%)`,
@@ -123,7 +120,7 @@ function SkeletonCard(){
 }
 
 // ─────────────────────────────────────────────────────────
-//  FORMULAIRE TÂCHE
+//  FORMULAIRE — FIXES APPLIQUÉS
 // ─────────────────────────────────────────────────────────
 function TaskForm({task,projects,users,onSave,onClose}){
   const [f,setF]=useState(task||{
@@ -139,17 +136,26 @@ function TaskForm({task,projects,users,onSave,onClose}){
 
   const validate=()=>{
     const e={}
-    if(!f.title.trim()||f.title.trim().length<2) e.title='Titre requis (min 2 caractères)'
+    if(!f.title?.trim()||f.title.trim().length<2) e.title='Titre requis (min 2 caractères)'
+    // ✅ FIX — project_id obligatoire
+    if(!f.project_id) e.project_id='Veuillez sélectionner un projet'
     if(f.date_debut&&f.due_date&&new Date(f.due_date)<new Date(f.date_debut))
       e.dates="L'échéance doit être après la date de début"
     setErr(e)
     return !Object.keys(e).length
   }
 
+  // ✅ FIX — types corrects, pas de onClose avant confirmation backend
   const submit=()=>{
     if(!validate()) return
-    onSave({...f,status:f.date_debut||f.due_date?autoStatus:f.status})
-    onClose()
+    onSave({
+      ...f,
+      project_id:  f.project_id  ? parseInt(f.project_id)  : null,
+      assignee_id: f.assignee_id ? parseInt(f.assignee_id) : null,
+      date_debut:  f.date_debut  || null,
+      due_date:    f.due_date    || null,
+      status:      f.date_debut||f.due_date ? autoStatus : f.status,
+    })
   }
 
   return(
@@ -169,18 +175,19 @@ function TaskForm({task,projects,users,onSave,onClose}){
         <label style={S.label}>Description</label>
         <textarea style={{...S.input,resize:'vertical',minHeight:70,fontFamily:'inherit'}}
           value={f.description||''} onChange={e=>s('description',e.target.value)}
-          placeholder="Description détaillée de la tâche…"/>
+          placeholder="Description détaillée…"/>
       </div>
 
-      {/* Projet + Priorité */}
+      {/* Projet * + Priorité */}
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
         <div>
-          <label style={S.label}>Projet</label>
-          <select style={{...S.input,background:C.surface}}
-            value={f.project_id||''} onChange={e=>s('project_id',e.target.value)}>
-            <option value="">— Aucun projet —</option>
+          <label style={S.label}>Projet *</label>
+          <select style={{...S.input,background:C.surface,...(err.project_id?{borderColor:'#ff2d78'}:{})}}
+            value={f.project_id||''} onChange={e=>{s('project_id',e.target.value);setErr(x=>({...x,project_id:''}))}}>
+            <option value="">— Sélectionner un projet —</option>
             {projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
+          {err.project_id&&<p style={{color:'#ff2d78',fontSize:10,marginTop:4}}>{err.project_id}</p>}
         </div>
         <div>
           <label style={S.label}>Priorité</label>
@@ -239,19 +246,15 @@ function TaskForm({task,projects,users,onSave,onClose}){
         </motion.div>
       )}
 
-      {/* Assigné (par user_id) + Statut manuel */}
+      {/* Assigné + Statut manuel */}
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
         <div>
           <label style={S.label}>Assigné à</label>
           {users.length>0?(
             <select style={{...S.input,background:C.surface}}
-              value={f.assignee_id||f.assignee||''} onChange={e=>s('assignee_id',e.target.value)}>
+              value={f.assignee_id||''} onChange={e=>s('assignee_id',e.target.value)}>
               <option value="">— Non assigné —</option>
-              {users.map(u=>(
-                <option key={u.id} value={u.id}>
-                  {u.name} ({u.role})
-                </option>
-              ))}
+              {users.map(u=><option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
             </select>
           ):(
             <input style={S.input} value={f.assignee||''}
@@ -278,7 +281,6 @@ function TaskForm({task,projects,users,onSave,onClose}){
         border:'1px solid rgba(0,200,255,0.15)',borderRadius:8,fontSize:11,color:C.t2,lineHeight:1.6}}>
         <span style={{fontFamily:'Orbitron,sans-serif',fontWeight:700,fontSize:9,
           color:C.cyan,display:'block',marginBottom:4}}>⚡ AUTOMATISATION</span>
-        Le statut est mis à jour selon les dates :
         date début atteinte → <strong style={{color:'#00c8ff'}}>En cours</strong> •{' '}
         échéance dépassée → <strong style={{color:'#ff2d78'}}>En retard</strong>
       </div>
@@ -296,7 +298,7 @@ function TaskForm({task,projects,users,onSave,onClose}){
 }
 
 // ─────────────────────────────────────────────────────────
-//  CARTE TÂCHE — KANBAN
+//  CARTE KANBAN
 // ─────────────────────────────────────────────────────────
 function TaskCard({task,col,canEdit,allUsers,onEdit,onDelete,onQuickDone,onDragStart,onDragEnd}){
   const daysLeft=getDaysLeft(task.due_date)
@@ -308,45 +310,36 @@ function TaskCard({task,col,canEdit,allUsers,onEdit,onDelete,onQuickDone,onDragS
   ,[task.assignee_id,task.assignee,allUsers])
 
   return(
-    <motion.div layout
-      draggable={canEdit}
-      onDragStart={e=>onDragStart(e,task)}
-      onDragEnd={onDragEnd}
+    <motion.div layout draggable={canEdit}
+      onDragStart={e=>onDragStart(e,task)} onDragEnd={onDragEnd}
       initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0,scale:0.95}}
       whileHover={{y:-2,boxShadow:`0 8px 24px rgba(0,0,0,0.4),0 0 0 1px ${col.color}22`}}
       style={{background:'rgba(255,255,255,0.03)',border:`1px solid rgba(255,255,255,0.07)`,
-        borderRadius:11,padding:13,marginBottom:9,
-        cursor:canEdit?'grab':'default',
+        borderRadius:11,padding:13,marginBottom:9,cursor:canEdit?'grab':'default',
         borderLeft:`3px solid ${PC[task.priority]||C.t3}`,
         transition:'box-shadow 0.2s',position:'relative'}}>
 
-      {/* Header */}
       <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:8,marginBottom:8}}>
         <p style={{fontSize:12,fontFamily:'Orbitron,sans-serif',fontWeight:700,
           color:C.t1,lineHeight:1.3,flex:1}}>{task.title}</p>
         {canEdit&&(
           <div style={{display:'flex',gap:2,flexShrink:0}}>
-            {/* Quick done */}
             {task.status!=='done'&&(
               <button onClick={e=>{e.stopPropagation();onQuickDone(task.id)}}
-                title="Marquer comme terminé"
-                style={{background:'none',border:'none',color:C.t3,cursor:'pointer',
-                  padding:3,borderRadius:4,display:'flex',transition:'color 0.15s'}}
+                style={{background:'none',border:'none',color:C.t3,cursor:'pointer',padding:3,borderRadius:4,display:'flex'}}
                 onMouseEnter={e=>e.currentTarget.style.color='#00ff88'}
                 onMouseLeave={e=>e.currentTarget.style.color=C.t3}>
                 <CheckCircle2 size={11}/>
               </button>
             )}
             <button onClick={()=>onEdit(task)}
-              style={{background:'none',border:'none',color:C.t3,cursor:'pointer',
-                padding:3,borderRadius:4,display:'flex',transition:'color 0.15s'}}
+              style={{background:'none',border:'none',color:C.t3,cursor:'pointer',padding:3,borderRadius:4,display:'flex'}}
               onMouseEnter={e=>e.currentTarget.style.color=C.cyan}
               onMouseLeave={e=>e.currentTarget.style.color=C.t3}>
               <Edit size={11}/>
             </button>
             <button onClick={()=>onDelete(task.id)}
-              style={{background:'none',border:'none',color:C.t3,cursor:'pointer',
-                padding:3,borderRadius:4,display:'flex',transition:'color 0.15s'}}
+              style={{background:'none',border:'none',color:C.t3,cursor:'pointer',padding:3,borderRadius:4,display:'flex'}}
               onMouseEnter={e=>e.currentTarget.style.color='#ff2d78'}
               onMouseLeave={e=>e.currentTarget.style.color=C.t3}>
               <Trash2 size={11}/>
@@ -355,7 +348,6 @@ function TaskCard({task,col,canEdit,allUsers,onEdit,onDelete,onQuickDone,onDragS
         )}
       </div>
 
-      {/* Description */}
       {task.description&&(
         <p style={{fontSize:11,color:C.t3,marginBottom:8,lineHeight:1.5,
           display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>
@@ -363,34 +355,16 @@ function TaskCard({task,col,canEdit,allUsers,onEdit,onDelete,onQuickDone,onDragS
         </p>
       )}
 
-      {/* Badges */}
       <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap',marginBottom:8}}>
         <span style={{fontSize:9,fontFamily:'Orbitron,sans-serif',fontWeight:700,
           padding:'2px 7px',borderRadius:5,
-          background:`${PC[task.priority]||C.t2}15`,
-          color:PC[task.priority]||C.t2,
+          background:`${PC[task.priority]||C.t2}15`,color:PC[task.priority]||C.t2,
           border:`1px solid ${PC[task.priority]||C.t2}28`}}>
           {(task.priority||'').toUpperCase()}
         </span>
-        {task.status==='overdue'&&(
-          <span style={{fontSize:9,fontFamily:'Orbitron,sans-serif',fontWeight:700,
-            padding:'2px 7px',borderRadius:5,background:'rgba(255,45,120,0.15)',
-            color:'#ff2d78',border:'1px solid rgba(255,45,120,0.3)',
-            display:'flex',alignItems:'center',gap:3}}>
-            <AlertTriangle size={8}/> AUTO
-          </span>
-        )}
-        {task.status==='inprogress'&&task.date_debut&&(
-          <span style={{fontSize:9,fontFamily:'Orbitron,sans-serif',fontWeight:700,
-            padding:'2px 7px',borderRadius:5,background:'rgba(0,200,255,0.1)',
-            color:'#00c8ff',border:'1px solid rgba(0,200,255,0.25)',
-            display:'flex',alignItems:'center',gap:3}}>
-            <Zap size={8}/> AUTO
-          </span>
-        )}
         {task.project&&(
-          <span style={{fontSize:9,color:C.t3,maxWidth:80,
-            overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',
+          <span style={{fontSize:9,color:C.t3,maxWidth:80,overflow:'hidden',
+            textOverflow:'ellipsis',whiteSpace:'nowrap',
             padding:'2px 5px',borderRadius:4,background:'rgba(255,255,255,0.04)',
             border:`1px solid ${C.border}`}}>
             {task.project}
@@ -398,30 +372,26 @@ function TaskCard({task,col,canEdit,allUsers,onEdit,onDelete,onQuickDone,onDragS
         )}
       </div>
 
-      {/* Footer */}
       {(assignee||task.due_date)&&(
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
           paddingTop:8,borderTop:`1px solid rgba(255,255,255,0.05)`}}>
           {assignee?(
             <div style={{display:'flex',alignItems:'center',gap:5}}>
               <UserAvatar user={assignee} size={20}/>
-              <span style={{fontSize:10,color:C.t2,
-                overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:80}}>
+              <span style={{fontSize:10,color:C.t2,overflow:'hidden',
+                textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:80}}>
                 {assignee.name}
               </span>
             </div>
           ):<span/>}
           {task.due_date&&(
-            <div style={{display:'flex',alignItems:'center',gap:4,
-              padding:'2px 7px',borderRadius:5,
+            <div style={{display:'flex',alignItems:'center',gap:4,padding:'2px 7px',borderRadius:5,
               background:isOverdue?'rgba(255,45,120,0.1)':isDueSoon?'rgba(255,206,0,0.08)':'transparent',
               border:isOverdue?'1px solid rgba(255,45,120,0.2)':isDueSoon?'1px solid rgba(255,206,0,0.2)':'none'}}>
               <Clock size={9} style={{color:isOverdue?'#ff2d78':isDueSoon?'#ffce00':C.t3}}/>
               <span style={{fontSize:9,fontFamily:'JetBrains Mono,monospace',
                 color:isOverdue?'#ff2d78':isDueSoon?'#ffce00':C.t3}}>
-                {isOverdue?`${Math.abs(daysLeft)}j retard`:
-                 daysLeft===0?"Aujourd'hui":
-                 daysLeft===1?'Demain':`${daysLeft}j`}
+                {isOverdue?`${Math.abs(daysLeft)}j retard`:daysLeft===0?"Aujourd'hui":daysLeft===1?'Demain':`${daysLeft}j`}
               </span>
             </div>
           )}
@@ -432,7 +402,7 @@ function TaskCard({task,col,canEdit,allUsers,onEdit,onDelete,onQuickDone,onDragS
 }
 
 // ─────────────────────────────────────────────────────────
-//  CARTE TÂCHE — LISTE
+//  LIGNE LISTE
 // ─────────────────────────────────────────────────────────
 function TaskRow({task,canEdit,allUsers,onEdit,onDelete,onQuickDone}){
   const daysLeft=getDaysLeft(task.due_date)
@@ -445,20 +415,15 @@ function TaskRow({task,canEdit,allUsers,onEdit,onDelete,onQuickDone}){
   ,[task.assignee_id,task.assignee,allUsers])
 
   return(
-    <motion.div layout
-      initial={{opacity:0,x:-6}} animate={{opacity:1,x:0}} exit={{opacity:0}}
+    <motion.div layout initial={{opacity:0,x:-6}} animate={{opacity:1,x:0}} exit={{opacity:0}}
       style={{display:'flex',alignItems:'center',gap:12,padding:'11px 16px',
         background:'rgba(255,255,255,0.02)',border:`1px solid rgba(255,255,255,0.07)`,
-        borderRadius:11,borderLeft:`3px solid ${PC[task.priority]||C.t3}`,
-        transition:'all 0.15s'}}
+        borderRadius:11,borderLeft:`3px solid ${PC[task.priority]||C.t3}`,transition:'all 0.15s'}}
       onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,0.04)'}
       onMouseLeave={e=>e.currentTarget.style.background='rgba(255,255,255,0.02)'}>
 
-      {/* Statut dot */}
-      <div style={{width:8,height:8,borderRadius:'50%',background:col.color,flexShrink:0,
-        boxShadow:`0 0 6px ${col.color}`}}/>
+      <div style={{width:8,height:8,borderRadius:'50%',background:col.color,flexShrink:0,boxShadow:`0 0 6px ${col.color}`}}/>
 
-      {/* Titre */}
       <div style={{flex:2,minWidth:0}}>
         <p style={{fontSize:12,fontFamily:'Orbitron,sans-serif',fontWeight:700,color:C.t1,
           overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{task.title}</p>
@@ -469,7 +434,6 @@ function TaskRow({task,canEdit,allUsers,onEdit,onDelete,onQuickDone}){
         )}
       </div>
 
-      {/* Projet */}
       {task.project&&(
         <span style={{fontSize:9,padding:'2px 8px',borderRadius:5,fontFamily:'Orbitron,sans-serif',
           background:'rgba(255,255,255,0.04)',color:C.t3,border:`1px solid ${C.border}`,
@@ -478,23 +442,19 @@ function TaskRow({task,canEdit,allUsers,onEdit,onDelete,onQuickDone}){
         </span>
       )}
 
-      {/* Priorité */}
       <span style={{fontSize:9,fontFamily:'Orbitron,sans-serif',fontWeight:700,
         padding:'2px 8px',borderRadius:5,flexShrink:0,
-        background:`${PC[task.priority]||C.t2}14`,
-        color:PC[task.priority]||C.t2,
+        background:`${PC[task.priority]||C.t2}14`,color:PC[task.priority]||C.t2,
         border:`1px solid ${PC[task.priority]||C.t2}26`}}>
         {(task.priority||'').toUpperCase()}
       </span>
 
-      {/* Statut */}
       <span style={{fontSize:9,fontFamily:'Orbitron,sans-serif',fontWeight:700,
         padding:'2px 8px',borderRadius:5,flexShrink:0,
         background:`${col.color}12`,color:col.color,border:`1px solid ${col.color}28`}}>
         {col.label}
       </span>
 
-      {/* Assigné */}
       {assignee?(
         <div style={{display:'flex',alignItems:'center',gap:5,flexShrink:0}}>
           <UserAvatar user={assignee} size={20}/>
@@ -502,38 +462,31 @@ function TaskRow({task,canEdit,allUsers,onEdit,onDelete,onQuickDone}){
         </div>
       ):<span style={{width:80}}/>}
 
-      {/* Échéance */}
       {task.due_date?(
         <span style={{fontSize:9,fontFamily:'JetBrains Mono,monospace',flexShrink:0,
           color:isOverdue?'#ff2d78':isDueSoon?'#ffce00':C.t3}}>
-          {isOverdue?`${Math.abs(daysLeft)}j retard`:
-           daysLeft===0?"Aujourd'hui":
-           daysLeft===1?'Demain':`${daysLeft}j`}
+          {isOverdue?`${Math.abs(daysLeft)}j retard`:daysLeft===0?"Aujourd'hui":daysLeft===1?'Demain':`${daysLeft}j`}
         </span>
       ):<span style={{width:50}}/>}
 
-      {/* Actions */}
       {canEdit&&(
         <div style={{display:'flex',gap:3,flexShrink:0}}>
           {task.status!=='done'&&(
-            <button onClick={()=>onQuickDone(task.id)} title="Terminé"
-              style={{background:'none',border:'none',color:C.t3,cursor:'pointer',
-                padding:4,borderRadius:4,display:'flex',transition:'color 0.15s'}}
+            <button onClick={()=>onQuickDone(task.id)}
+              style={{background:'none',border:'none',color:C.t3,cursor:'pointer',padding:4,borderRadius:4,display:'flex'}}
               onMouseEnter={e=>e.currentTarget.style.color='#00ff88'}
               onMouseLeave={e=>e.currentTarget.style.color=C.t3}>
               <CheckCircle2 size={12}/>
             </button>
           )}
           <button onClick={()=>onEdit(task)}
-            style={{background:'none',border:'none',color:C.t3,cursor:'pointer',
-              padding:4,borderRadius:4,display:'flex',transition:'color 0.15s'}}
+            style={{background:'none',border:'none',color:C.t3,cursor:'pointer',padding:4,borderRadius:4,display:'flex'}}
             onMouseEnter={e=>e.currentTarget.style.color=C.cyan}
             onMouseLeave={e=>e.currentTarget.style.color=C.t3}>
             <Edit size={12}/>
           </button>
           <button onClick={()=>onDelete(task.id)}
-            style={{background:'none',border:'none',color:C.t3,cursor:'pointer',
-              padding:4,borderRadius:4,display:'flex',transition:'color 0.15s'}}
+            style={{background:'none',border:'none',color:C.t3,cursor:'pointer',padding:4,borderRadius:4,display:'flex'}}
             onMouseEnter={e=>e.currentTarget.style.color='#ff2d78'}
             onMouseLeave={e=>e.currentTarget.style.color=C.t3}>
             <Trash2 size={12}/>
@@ -549,23 +502,23 @@ function TaskRow({task,canEdit,allUsers,onEdit,onDelete,onQuickDone}){
 // ─────────────────────────────────────────────────────────
 export default function Tasks(){
   const {getTasks,addTask,updateTask,deleteTask,moveTask,getProjects,showToast}=useApp()
-  const {can,user:cu}=useAuth()
+  const {can}=useAuth()
   const {confirm,Dialog}=useConfirm()
 
-  const [tasks,       setTasks]       = useState([])
-  const [projects,    setProjects]    = useState([])
-  const [users,       setUsers]       = useState([])
-  const [modal,       setModal]       = useState(null)
-  const [dragging,    setDragging]    = useState(null)
-  const [overCol,     setOverCol]     = useState(null)
-  const [busy,        setBusy]        = useState(true)
-  const [search,      setSearch]      = useState('')
-  const [filterPriority,setFilterPriority] = useState('all')
-  const [filterProject, setFilterProject]  = useState('all')
-  const [filterAssignee,setFilterAssignee] = useState('all')
-  const [filterStatus,  setFilterStatus]   = useState('all')
-  const [showFilters, setShowFilters] = useState(false)
-  const [view,        setView]        = useState('kanban') // kanban | list
+  const [tasks,         setTasks]         = useState([])
+  const [projects,      setProjects]      = useState([])
+  const [users,         setUsers]         = useState([])
+  const [modal,         setModal]         = useState(null)
+  const [dragging,      setDragging]      = useState(null)
+  const [overCol,       setOverCol]       = useState(null)
+  const [busy,          setBusy]          = useState(true)
+  const [search,        setSearch]        = useState('')
+  const [filterPriority,setFilterPriority]= useState('all')
+  const [filterProject, setFilterProject] = useState('all')
+  const [filterAssignee,setFilterAssignee]= useState('all')
+  const [filterStatus,  setFilterStatus]  = useState('all')
+  const [showFilters,   setShowFilters]   = useState(false)
+  const [view,          setView]          = useState('kanban')
 
   const canEdit=can('tasks')
 
@@ -574,17 +527,15 @@ export default function Tasks(){
     setBusy(true)
     try{
       const [t,p]=await Promise.all([getTasks(),getProjects()])
-      const raw=t||[]
-      const enriched=raw.map(task=>({
+      const enriched=(t||[]).map(task=>({
         ...task,
         status:computeAutoStatus(task),
-        project:p?.find(proj=>proj.id===task.project_id)?.name||task.project||'',
+        project:p?.find(proj=>String(proj.id)===String(task.project_id))?.name||task.project||'',
       }))
       setTasks(enriched)
       setProjects(p||[])
-      // Charger users
       try{
-        const api=(await import('../services/api.js')).api
+        const {api}=await import('../services/api.js')
         const res=await api.get('/users')
         if(res?.success) setUsers(res.data||[])
       }catch{}
@@ -605,20 +556,18 @@ export default function Tasks(){
   }),[tasks])
 
   // ── Filtres ──────────────────────────────────────────
-  const filteredTasks=useMemo(()=>{
-    return tasks.filter(t=>{
-      const mSearch=!search||
-        t.title?.toLowerCase().includes(search.toLowerCase())||
-        t.description?.toLowerCase().includes(search.toLowerCase())
-      const mPrio   =filterPriority==='all'||t.priority===filterPriority
-      const mProject=filterProject==='all'||String(t.project_id)===filterProject
-      const mStatus =filterStatus==='all'||t.status===filterStatus
-      const mAssignee=filterAssignee==='all'||
-        String(t.assignee_id)===filterAssignee||
-        t.assignee===users.find(u=>String(u.id)===filterAssignee)?.name
-      return mSearch&&mPrio&&mProject&&mStatus&&mAssignee
-    })
-  },[tasks,search,filterPriority,filterProject,filterStatus,filterAssignee,users])
+  const filteredTasks=useMemo(()=>tasks.filter(t=>{
+    const mSearch=!search||
+      t.title?.toLowerCase().includes(search.toLowerCase())||
+      t.description?.toLowerCase().includes(search.toLowerCase())
+    const mPrio    =filterPriority==='all'||t.priority===filterPriority
+    const mProject =filterProject==='all'||String(t.project_id)===filterProject
+    const mStatus  =filterStatus==='all'||t.status===filterStatus
+    const mAssignee=filterAssignee==='all'||
+      String(t.assignee_id)===filterAssignee||
+      t.assignee===users.find(u=>String(u.id)===filterAssignee)?.name
+    return mSearch&&mPrio&&mProject&&mStatus&&mAssignee
+  }),[tasks,search,filterPriority,filterProject,filterStatus,filterAssignee,users])
 
   const hasActiveFilter=search||filterPriority!=='all'||filterProject!=='all'||
     filterAssignee!=='all'||filterStatus!=='all'
@@ -633,34 +582,59 @@ export default function Tasks(){
     try{
       if(modal.type==='add'){
         const res=await addTask(data)
-        // Optimistic
-        setTasks(prev=>[...prev,{
-          ...data,
-          id:res?.id||Date.now(),
-          status:computeAutoStatus(data),
-          project:projects.find(p=>String(p.id)===String(data.project_id))?.name||''
-        }])
+        if(!res?.success){
+          const msg=res?.message||
+            Object.values(res?.errors||{}).flat().join(' | ')||
+            'Erreur création'
+          showToast(msg,'danger')
+          return
+        }
+        // ✅ FIX — res.data peut être array ou object
+        if(Array.isArray(res.data)){
+          setTasks(res.data.map(t=>({
+            ...t,
+            status:computeAutoStatus(t),
+            project:projects.find(p=>String(p.id)===String(t.project_id))?.name||t.project||''
+          })))
+        }else{
+          const newTask=res.data||res.task||res
+          setTasks(prev=>[...prev,{
+            ...newTask,
+            status:computeAutoStatus(newTask),
+            project:projects.find(p=>String(p.id)===String(newTask.project_id))?.name||''
+          }])
+        }
         showToast('Tâche créée !','success')
+        setModal(null)
+        load()
       }else{
-        await updateTask(modal.task.id,data)
+        const res=await updateTask(modal.task.id,data)
+        if(!res?.success){
+          const msg=res?.message||
+            Object.values(res?.errors||{}).flat().join(' | ')||
+            'Erreur mise à jour'
+          showToast(msg,'danger')
+          return
+        }
+        const updated=res.data||res.task||{...modal.task,...data}
         setTasks(prev=>prev.map(t=>t.id===modal.task.id?{
-          ...t,...data,
-          status:computeAutoStatus(data),
-          project:projects.find(p=>String(p.id)===String(data.project_id))?.name||t.project
+          ...updated,
+          status:computeAutoStatus(updated),
+          project:projects.find(p=>String(p.id)===String(updated.project_id))?.name||t.project
         }:t))
         showToast('Tâche mise à jour !','success')
+        setModal(null)
+        load()
       }
-      setModal(null)
-      load()
     }catch(e){
       showToast(e?.message||'Erreur lors de la sauvegarde','danger')
+      load()
     }
   }
 
   const handleDelete=async id=>{
     const ok=await confirm('Supprimer cette tâche définitivement ?')
     if(!ok) return
-    // Optimistic
     setTasks(prev=>prev.filter(t=>t.id!==id))
     try{
       await deleteTask(id)
@@ -671,9 +645,7 @@ export default function Tasks(){
     }
   }
 
-  // ── Quick Done ───────────────────────────────────────
   const handleQuickDone=async id=>{
-    // Optimistic
     setTasks(prev=>prev.map(t=>t.id===id?{...t,status:'done'}:t))
     try{
       await moveTask(id,'done')
@@ -685,27 +657,14 @@ export default function Tasks(){
   }
 
   // ── Drag & Drop ──────────────────────────────────────
-  const onDragStart=(e,task)=>{
-    setDragging(task)
-    e.dataTransfer.setData('taskId',String(task.id))
-    e.currentTarget.style.opacity='0.4'
-  }
-  const onDragEnd=e=>{
-    setDragging(null)
-    setOverCol(null)
-    e.currentTarget.style.opacity='1'
-  }
-  const onDragOver=(e,colId)=>{
-    e.preventDefault()
-    setOverCol(colId)
-  }
+  const onDragStart=(e,task)=>{setDragging(task);e.dataTransfer.setData('taskId',String(task.id));e.currentTarget.style.opacity='0.4'}
+  const onDragEnd=e=>{setDragging(null);setOverCol(null);e.currentTarget.style.opacity='1'}
+  const onDragOver=(e,colId)=>{e.preventDefault();setOverCol(colId)}
   const onDrop=async(e,colId)=>{
-    e.preventDefault()
-    setOverCol(null)
+    e.preventDefault();setOverCol(null)
     const id=Number(e.dataTransfer.getData('taskId'))
     const task=tasks.find(t=>t.id===id)
     if(!task||task.status===colId) return
-    // Optimistic
     setTasks(prev=>prev.map(t=>t.id===id?{...t,status:colId}:t))
     try{
       await moveTask(id,colId)
@@ -723,20 +682,16 @@ export default function Tasks(){
     <div>
       <style>{`
         @keyframes skPulse{0%{background-position:200% 0}100%{background-position:-200% 0}}
-        @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
       `}</style>
-
       {Dialog}
 
-      {/* ── En-tête ── */}
+      {/* En-tête */}
       <div style={{marginBottom:24}}>
-        <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',
-          flexWrap:'wrap',gap:14,marginBottom:16}}>
+        <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',flexWrap:'wrap',gap:14,marginBottom:16}}>
           <div>
             <h1 style={{fontFamily:'Orbitron,sans-serif',fontWeight:900,fontSize:24,
               background:'linear-gradient(135deg,#00c8ff,#e8f4ff)',
-              WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',
-              backgroundClip:'text',marginBottom:4}}>TÂCHES</h1>
+              WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text',marginBottom:4}}>TÂCHES</h1>
             <p style={{color:C.t2,fontSize:13}}>
               {stats.total} tâche{stats.total>1?'s':''}{' '}
               {stats.overdue>0&&<>• <span style={{color:'#ff2d78'}}>{stats.overdue} en retard</span></>}
@@ -744,17 +699,12 @@ export default function Tasks(){
             </p>
           </div>
           <div style={{display:'flex',gap:8}}>
-            <button onClick={load} style={{...S.btnGhost,padding:'8px 12px'}} title="Rafraîchir">
-              <RefreshCw size={13}/>
-            </button>
-            {/* Toggle vue */}
-            <div style={{display:'flex',gap:2,padding:3,borderRadius:8,
-              background:'rgba(255,255,255,0.03)',border:`1px solid ${C.border}`}}>
-              {[{id:'kanban',Icon:LayoutGrid,label:'Kanban'},{id:'list',Icon:List,label:'Liste'}].map(({id,Icon,label})=>(
-                <button key={id} onClick={()=>setView(id)} title={label}
+            <button onClick={load} style={{...S.btnGhost,padding:'8px 12px'}} title="Rafraîchir"><RefreshCw size={13}/></button>
+            <div style={{display:'flex',gap:2,padding:3,borderRadius:8,background:'rgba(255,255,255,0.03)',border:`1px solid ${C.border}`}}>
+              {[{id:'kanban',Icon:LayoutGrid},{id:'list',Icon:List}].map(({id,Icon})=>(
+                <button key={id} onClick={()=>setView(id)}
                   style={{padding:'5px 8px',borderRadius:6,border:'none',cursor:'pointer',
-                    background:view===id?C.cyan:'transparent',
-                    color:view===id?'#020408':C.t3,
+                    background:view===id?C.cyan:'transparent',color:view===id?'#020408':C.t3,
                     display:'flex',alignItems:'center',transition:'all 0.15s'}}>
                   <Icon size={13}/>
                 </button>
@@ -768,23 +718,20 @@ export default function Tasks(){
           </div>
         </div>
 
-        {/* Stats cards cliquables */}
+        {/* Stats cards */}
         <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:16}}>
           {[
-            {label:'À faire',   value:stats.todo,       color:'#ffce00', icon:Circle,        id:'todo'},
-            {label:'En cours',  value:stats.inprogress, color:'#00c8ff', icon:PlayCircle,    id:'inprogress'},
-            {label:'En retard', value:stats.overdue,    color:'#ff2d78', icon:AlertTriangle, id:'overdue'},
-            {label:'Terminées', value:stats.done,       color:'#00ff88', icon:CheckCircle2,  id:'done'},
+            {label:'À faire',   value:stats.todo,       color:'#ffce00',icon:Circle,        id:'todo'},
+            {label:'En cours',  value:stats.inprogress, color:'#00c8ff',icon:PlayCircle,    id:'inprogress'},
+            {label:'En retard', value:stats.overdue,    color:'#ff2d78',icon:AlertTriangle, id:'overdue'},
+            {label:'Terminées', value:stats.done,       color:'#00ff88',icon:CheckCircle2,  id:'done'},
           ].map(({label,value,color,icon:Icon,id})=>{
             const active=filterStatus===id
             return(
-              <motion.div key={label} whileHover={{y:-2}}
-                onClick={()=>setFilterStatus(active?'all':id)}
-                style={{background:active?`${color}15`:`${color}08`,
-                  border:`1px solid ${active?color:color+'20'}`,
-                  borderRadius:10,padding:'12px 14px',
-                  display:'flex',alignItems:'center',gap:10,
-                  cursor:'pointer',transition:'all 0.2s',
+              <motion.div key={id} whileHover={{y:-2}} onClick={()=>setFilterStatus(active?'all':id)}
+                style={{background:active?`${color}15`:`${color}08`,border:`1px solid ${active?color:color+'20'}`,
+                  borderRadius:10,padding:'12px 14px',display:'flex',alignItems:'center',gap:10,
+                  cursor:'pointer',transition:'all 0.2s',position:'relative',
                   boxShadow:active?`0 0 20px ${color}20`:undefined}}>
                 <Icon size={18} style={{color,flexShrink:0}}/>
                 <div style={{flex:1}}>
@@ -804,13 +751,12 @@ export default function Tasks(){
           })}
         </div>
 
-        {/* Barre recherche + filtres */}
+        {/* Recherche + filtres */}
         <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:8}}>
           <div style={{position:'relative',flex:1,minWidth:200}}>
             <Search size={13} style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',color:C.t3}}/>
             <input value={search} onChange={e=>setSearch(e.target.value)}
-              placeholder="Rechercher une tâche, description…"
-              style={{...S.input,paddingLeft:34}}/>
+              placeholder="Rechercher une tâche…" style={{...S.input,paddingLeft:34}}/>
             {search&&(
               <button onClick={()=>setSearch('')}
                 style={{position:'absolute',right:10,top:'50%',transform:'translateY(-50%)',
@@ -819,73 +765,56 @@ export default function Tasks(){
               </button>
             )}
           </div>
-
           <button onClick={()=>setShowFilters(v=>!v)}
             style={{...S.btnGhost,display:'flex',alignItems:'center',gap:6,
               borderColor:showFilters||hasActiveFilter?C.cyan:undefined,
               color:showFilters||hasActiveFilter?C.cyan:undefined}}>
             <Filter size={13}/> Filtres
-            {hasActiveFilter&&(
-              <span style={{width:7,height:7,borderRadius:'50%',background:C.cyan,flexShrink:0}}/>
-            )}
+            {hasActiveFilter&&<span style={{width:7,height:7,borderRadius:'50%',background:C.cyan}}/>}
           </button>
-
           {hasActiveFilter&&(
-            <button onClick={clearFilters}
-              style={{...S.btnGhost,display:'flex',alignItems:'center',gap:5,fontSize:11}}>
+            <button onClick={clearFilters} style={{...S.btnGhost,display:'flex',alignItems:'center',gap:5,fontSize:11}}>
               <X size={11}/> Effacer
             </button>
           )}
         </div>
 
-        {/* Panel filtres expandable */}
         <AnimatePresence>
           {showFilters&&(
             <motion.div initial={{opacity:0,height:0}} animate={{opacity:1,height:'auto'}} exit={{opacity:0,height:0}}
               style={{overflow:'hidden',marginBottom:8}}>
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:10,
-                padding:14,background:'rgba(0,200,255,0.03)',
-                border:`1px solid rgba(0,200,255,0.12)`,borderRadius:10}}>
-                {/* Priorité */}
+                padding:14,background:'rgba(0,200,255,0.03)',border:`1px solid rgba(0,200,255,0.12)`,borderRadius:10}}>
                 <div>
                   <label style={S.label}>Priorité</label>
-                  <select style={{...S.input,background:C.surface}}
-                    value={filterPriority} onChange={e=>setFilterPriority(e.target.value)}>
-                    <option value="all">Toutes les priorités</option>
+                  <select style={{...S.input,background:C.surface}} value={filterPriority} onChange={e=>setFilterPriority(e.target.value)}>
+                    <option value="all">Toutes</option>
                     <option value="urgent">🔴 Urgente</option>
                     <option value="high">🔥 Haute</option>
                     <option value="medium">🔶 Moyenne</option>
                     <option value="low">🔵 Faible</option>
                   </select>
                 </div>
-                {/* Projet */}
                 <div>
                   <label style={S.label}>Projet</label>
-                  <select style={{...S.input,background:C.surface}}
-                    value={filterProject} onChange={e=>setFilterProject(e.target.value)}>
-                    <option value="all">Tous les projets</option>
+                  <select style={{...S.input,background:C.surface}} value={filterProject} onChange={e=>setFilterProject(e.target.value)}>
+                    <option value="all">Tous</option>
                     {projects.map(p=><option key={p.id} value={String(p.id)}>{p.name}</option>)}
                   </select>
                 </div>
-                {/* Assigné */}
                 {users.length>0&&(
                   <div>
                     <label style={S.label}>Assigné à</label>
-                    <select style={{...S.input,background:C.surface}}
-                      value={filterAssignee} onChange={e=>setFilterAssignee(e.target.value)}>
-                      <option value="all">Tous les membres</option>
-                      {users.map(u=>(
-                        <option key={u.id} value={String(u.id)}>{u.name}</option>
-                      ))}
+                    <select style={{...S.input,background:C.surface}} value={filterAssignee} onChange={e=>setFilterAssignee(e.target.value)}>
+                      <option value="all">Tous</option>
+                      {users.map(u=><option key={u.id} value={String(u.id)}>{u.name}</option>)}
                     </select>
                   </div>
                 )}
-                {/* Statut */}
                 <div>
                   <label style={S.label}>Statut</label>
-                  <select style={{...S.input,background:C.surface}}
-                    value={filterStatus} onChange={e=>setFilterStatus(e.target.value)}>
-                    <option value="all">Tous les statuts</option>
+                  <select style={{...S.input,background:C.surface}} value={filterStatus} onChange={e=>setFilterStatus(e.target.value)}>
+                    <option value="all">Tous</option>
                     <option value="todo">📋 À faire</option>
                     <option value="inprogress">⚡ En cours</option>
                     <option value="overdue">🚨 En retard</option>
@@ -897,7 +826,6 @@ export default function Tasks(){
           )}
         </AnimatePresence>
 
-        {/* Résumé filtre actif */}
         {hasActiveFilter&&(
           <p style={{fontSize:11,color:C.t3,marginBottom:4}}>
             <span style={{color:C.cyan,fontWeight:700}}>{filteredTasks.length}</span>
@@ -906,35 +834,29 @@ export default function Tasks(){
         )}
       </div>
 
-      {/* ══ VUE KANBAN ═══════════════════════════════════════ */}
+      {/* KANBAN */}
       {view==='kanban'&&(
         <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:14}}>
           {COLS.map(col=>{
             const colTasks=filteredTasks.filter(t=>t.status===col.id)
             const isOver=overCol===col.id&&dragging?.status!==col.id
-
             return(
               <div key={col.id}
                 onDragOver={e=>onDragOver(e,col.id)}
                 onDragLeave={()=>setOverCol(null)}
                 onDrop={e=>onDrop(e,col.id)}
                 style={{background:isOver?`${col.color}07`:'rgba(255,255,255,0.015)',
-                  border:`1px solid ${isOver?col.color:col.id==='overdue'?'rgba(255,45,120,0.15)':'rgba(255,255,255,0.06)'}`,
-                  borderTop:`3px solid ${col.color}`,
-                  borderRadius:12,padding:14,minHeight:480,
-                  transition:'all 0.2s',
-                  boxShadow:isOver?`0 0 24px ${col.color}20`:undefined}}>
-
-                {/* Header colonne */}
+                  border:`1px solid ${isOver?col.color:'rgba(255,255,255,0.06)'}`,
+                  borderTop:`3px solid ${col.color}`,borderRadius:12,padding:14,minHeight:480,
+                  transition:'all 0.2s',boxShadow:isOver?`0 0 24px ${col.color}20`:undefined}}>
                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
                   <div style={{display:'flex',alignItems:'center',gap:8}}>
                     <col.icon size={14} style={{color:col.color}}/>
                     <span style={{fontFamily:'Orbitron,sans-serif',fontWeight:800,fontSize:10,
                       letterSpacing:'0.08em',color:col.color}}>{col.label}</span>
                     <motion.span key={colTasks.length} initial={{scale:1.3}} animate={{scale:1}}
-                      style={{width:20,height:20,borderRadius:'50%',display:'flex',
-                        alignItems:'center',justifyContent:'center',fontSize:10,
-                        fontFamily:'Orbitron,sans-serif',fontWeight:800,
+                      style={{width:20,height:20,borderRadius:'50%',display:'flex',alignItems:'center',
+                        justifyContent:'center',fontSize:10,fontFamily:'Orbitron,sans-serif',fontWeight:800,
                         background:`${col.color}18`,color:col.color}}>
                       {colTasks.length}
                     </motion.span>
@@ -942,53 +864,32 @@ export default function Tasks(){
                   {canEdit&&(
                     <button onClick={()=>setModal({type:'add'})}
                       style={{background:'none',border:`1px solid ${C.border}`,borderRadius:5,
-                        color:C.t3,cursor:'pointer',width:22,height:22,
-                        display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,
-                        transition:'all 0.15s'}}
+                        color:C.t3,cursor:'pointer',width:22,height:22,display:'flex',
+                        alignItems:'center',justifyContent:'center',fontSize:14,transition:'all 0.15s'}}
                       onMouseEnter={e=>{e.currentTarget.style.borderColor=col.color;e.currentTarget.style.color=col.color}}
                       onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.t3}}>
                       +
                     </button>
                   )}
                 </div>
-
-                {/* Note auto retard */}
-                {col.id==='overdue'&&colTasks.length>0&&(
-                  <div style={{padding:'6px 9px',background:'rgba(255,45,120,0.06)',
-                    border:'1px solid rgba(255,45,120,0.15)',borderRadius:7,marginBottom:10,
-                    fontSize:10,color:'#ff2d78',display:'flex',alignItems:'center',gap:6}}>
-                    <Zap size={10}/> Statut mis à jour automatiquement
-                  </div>
-                )}
-
-                {/* Cartes skeleton ou réelles */}
                 <div>
-                  {busy
-                    ?Array.from({length:2}).map((_,i)=><SkeletonCard key={i}/>)
-                    :(
-                      <AnimatePresence>
-                        {colTasks.map(t=>(
-                          <TaskCard key={t.id} task={t} col={col}
-                            canEdit={canEdit} allUsers={users}
-                            onEdit={task=>setModal({type:'edit',task})}
-                            onDelete={handleDelete}
-                            onQuickDone={handleQuickDone}
-                            onDragStart={onDragStart}
-                            onDragEnd={onDragEnd}/>
-                        ))}
-                      </AnimatePresence>
-                    )
-                  }
-
-                  {/* Zone drop vide */}
+                  {busy?Array.from({length:2}).map((_,i)=><SkeletonCard key={i}/>):(
+                    <AnimatePresence>
+                      {colTasks.map(t=>(
+                        <TaskCard key={t.id} task={t} col={col} canEdit={canEdit} allUsers={users}
+                          onEdit={task=>setModal({type:'edit',task})}
+                          onDelete={handleDelete} onQuickDone={handleQuickDone}
+                          onDragStart={onDragStart} onDragEnd={onDragEnd}/>
+                      ))}
+                    </AnimatePresence>
+                  )}
                   {!busy&&colTasks.length===0&&(
                     <div style={{display:'flex',flexDirection:'column',alignItems:'center',
                       justifyContent:'center',height:120,borderRadius:9,
                       border:`2px dashed ${isOver?col.color:col.color+'18'}`,
                       fontSize:10,color:isOver?col.color:C.t3,
-                      fontFamily:'Orbitron,sans-serif',fontWeight:700,
-                      transition:'all 0.2s',gap:6}}>
-                      {isOver?<><col.icon size={16}/> DÉPOSER ICI</>:<>Aucune tâche</>}
+                      fontFamily:'Orbitron,sans-serif',fontWeight:700,transition:'all 0.2s',gap:6}}>
+                      {isOver?<><col.icon size={16}/> DÉPOSER ICI</>:'Aucune tâche'}
                     </div>
                   )}
                 </div>
@@ -998,67 +899,48 @@ export default function Tasks(){
         </div>
       )}
 
-      {/* ══ VUE LISTE ════════════════════════════════════════ */}
+      {/* LISTE */}
       {view==='list'&&(
         <div style={{display:'flex',flexDirection:'column',gap:6}}>
-          {/* Header liste */}
-          <div style={{display:'grid',
-            gridTemplateColumns:'8px 2fr 100px 80px 80px 100px 50px auto',
-            gap:12,padding:'8px 16px',
-            fontSize:9,fontFamily:'Orbitron,sans-serif',fontWeight:700,
-            color:C.t3,letterSpacing:'0.1em'}}>
-            <span/>
-            <span>TÂCHE</span>
-            <span>PROJET</span>
-            <span>PRIORITÉ</span>
-            <span>STATUT</span>
-            <span>ASSIGNÉ</span>
-            <span>ÉCHÉANCE</span>
+          <div style={{display:'grid',gridTemplateColumns:'8px 2fr 100px 80px 80px 100px 50px auto',
+            gap:12,padding:'8px 16px',fontSize:9,fontFamily:'Orbitron,sans-serif',
+            fontWeight:700,color:C.t3,letterSpacing:'0.1em'}}>
+            <span/><span>TÂCHE</span><span>PROJET</span><span>PRIORITÉ</span>
+            <span>STATUT</span><span>ASSIGNÉ</span><span>ÉCHÉANCE</span>
             {canEdit&&<span>ACTIONS</span>}
           </div>
-
-          {busy
-            ?Array.from({length:6}).map((_,i)=>(
-              <div key={i} style={{height:54,background:'rgba(255,255,255,0.02)',
-                border:`1px solid rgba(255,255,255,0.06)`,borderRadius:11,
-                animation:'skPulse 1.4s ease infinite',
-                backgroundImage:`linear-gradient(90deg,${C.border}44 25%,${C.border}99 50%,${C.border}44 75%)`,
-                backgroundSize:'200% 100%'}}/>
-            ))
-            :(
-              <AnimatePresence>
-                {filteredTasks.length===0?(
-                  <Empty icon={CheckSquare}
-                    msg={hasActiveFilter?'Aucune tâche ne correspond':'Aucune tâche'}
-                    sub={hasActiveFilter?'Modifiez vos filtres':'Créez votre première tâche'}/>
-                ):(
-                  filteredTasks.map((t,i)=>(
-                    <motion.div key={t.id}
-                      initial={{opacity:0,x:-6}} animate={{opacity:1,x:0}}
-                      transition={{delay:i*0.02}}>
-                      <TaskRow task={t} canEdit={canEdit} allUsers={users}
-                        onEdit={task=>setModal({type:'edit',task})}
-                        onDelete={handleDelete}
-                        onQuickDone={handleQuickDone}/>
-                    </motion.div>
-                  ))
-                )}
-              </AnimatePresence>
-            )
-          }
-
-          {/* Footer total */}
+          {busy?Array.from({length:6}).map((_,i)=>(
+            <div key={i} style={{height:54,background:'rgba(255,255,255,0.02)',
+              border:`1px solid rgba(255,255,255,0.06)`,borderRadius:11,
+              animation:'skPulse 1.4s ease infinite',
+              backgroundImage:`linear-gradient(90deg,${C.border}44 25%,${C.border}99 50%,${C.border}44 75%)`,
+              backgroundSize:'200% 100%'}}/>
+          )):(
+            <AnimatePresence>
+              {filteredTasks.length===0?(
+                <Empty icon={CheckSquare}
+                  msg={hasActiveFilter?'Aucune tâche ne correspond':'Aucune tâche'}
+                  sub={hasActiveFilter?'Modifiez vos filtres':'Créez votre première tâche'}/>
+              ):(
+                filteredTasks.map((t,i)=>(
+                  <motion.div key={t.id} initial={{opacity:0,x:-6}} animate={{opacity:1,x:0}} transition={{delay:i*0.02}}>
+                    <TaskRow task={t} canEdit={canEdit} allUsers={users}
+                      onEdit={task=>setModal({type:'edit',task})}
+                      onDelete={handleDelete} onQuickDone={handleQuickDone}/>
+                  </motion.div>
+                ))
+              )}
+            </AnimatePresence>
+          )}
           {!busy&&filteredTasks.length>0&&(
-            <div style={{display:'flex',gap:16,padding:'10px 16px',
-              borderTop:`1px solid ${C.border}`,marginTop:4,flexWrap:'wrap'}}>
+            <div style={{display:'flex',gap:16,padding:'10px 16px',borderTop:`1px solid ${C.border}`,marginTop:4,flexWrap:'wrap'}}>
               {COLS.map(col=>{
                 const count=filteredTasks.filter(t=>t.status===col.id).length
                 if(!count) return null
                 return(
                   <span key={col.id} style={{fontSize:10,fontFamily:'Orbitron,sans-serif',
                     display:'flex',alignItems:'center',gap:5,color:C.t3}}>
-                    <span style={{color:col.color,fontWeight:700}}>{count}</span>
-                    {col.label}
+                    <span style={{color:col.color,fontWeight:700}}>{count}</span> {col.label}
                   </span>
                 )
               })}
@@ -1067,19 +949,13 @@ export default function Tasks(){
         </div>
       )}
 
-      {/* ── Modal ── */}
+      {/* Modal */}
       <AnimatePresence>
         {modal&&(
-          <MShell
-            title={modal.type==='add'?'NOUVELLE TÂCHE':'MODIFIER LA TÂCHE'}
-            onClose={()=>setModal(null)}
-            wide>
-            <TaskForm
-              task={modal.task}
-              projects={projects}
-              users={users}
-              onSave={handleSave}
-              onClose={()=>setModal(null)}/>
+          <MShell title={modal.type==='add'?'NOUVELLE TÂCHE':'MODIFIER LA TÂCHE'}
+            onClose={()=>setModal(null)} wide>
+            <TaskForm task={modal.task} projects={projects} users={users}
+              onSave={handleSave} onClose={()=>setModal(null)}/>
           </MShell>
         )}
       </AnimatePresence>

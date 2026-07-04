@@ -18,14 +18,15 @@ jobs:
           git reset --hard origin/staging
           sed -i 's/DB_HOST=127.0.0.1/DB_HOST=test-database/g' /srv/test/app/backend/.env
           cd /srv/test
-          docker compose up -d --build
+          docker compose build
+          docker compose up -d
           sleep 15
           echo "=== HEALTH CHECK ==="
           curl -f http://localhost:8080/api/health && echo "Backend OK" || echo "Backend FAILED"
           docker ps
           echo "========================================="
           echo "APPLICATION DISPONIBLE SUR TEST"
-          echo "http://192.168.137.57:8080"
+          echo "http://192.168.56.10:8080"
           echo "========================================="
 
   # ÉTAPE 2 — Agent teste l'application dans le navigateur
@@ -39,7 +40,7 @@ jobs:
         run: |
           echo "========================================="
           echo "AGENT - Testez l application sur :"
-          echo "http://192.168.137.57:8080"
+          echo "http://192.168.56.10:8080"
           echo "-----------------------------------------"
           echo "Approuvez si OK"
           echo "Rejetez avec commentaire si probleme"
@@ -56,7 +57,7 @@ jobs:
         run: |
           echo "========================================="
           echo "CHEF - Verifiez l application sur :"
-          echo "http://192.168.137.57:8080"
+          echo "http://192.168.56.10:8080"
           echo "-----------------------------------------"
           echo "Approuvez pour deployer en PROD"
           echo "Rejetez avec commentaire si probleme"
@@ -100,21 +101,22 @@ jobs:
     steps:
       - name: Envoyer archive vers PROD
         run: |
-          scp /srv/test/archives/projet.tar.gz deployer@192.168.137.144:/srv/prod/
+          scp /srv/test/archives/projet.tar.gz deployer@192.168.56.101:/srv/prod/
           echo "Archive envoyee vers PROD"
 
       - name: Deployer sur PROD
         run: |
-          ssh deployer@192.168.137.144 "
+          ssh deployer@192.168.56.101 "
             mkdir -p /srv/prod/app/frontend &&
             mkdir -p /srv/prod/app/backend &&
             mkdir -p /srv/prod/app/database &&
             tar -xzf /srv/prod/projet.tar.gz -C /srv/prod/app/ &&
             cd /srv/prod &&
             docker compose -f docker-compose.prod.yml down --remove-orphans &&
-            docker compose -f docker-compose.prod.yml up -d --build &&
+            docker compose -f docker-compose.prod.yml build &&
+            docker compose -f docker-compose.prod.yml up -d &&
             sleep 15 &&
             bash /srv/prod/deploy-post.sh &&
             docker ps &&
-            echo 'PROD deploye - Client accede sur http://192.168.137.144:80'
+            echo 'PROD deploye - Client accede sur http://192.168.56.101:80'
           "
