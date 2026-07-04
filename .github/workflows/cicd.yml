@@ -19,6 +19,7 @@ jobs:
           sed -i 's/DB_HOST=127.0.0.1/DB_HOST=test-database/g' /srv/test/app/backend/.env
           cd /srv/test
           docker compose build
+          docker compose run --rm --no-deps test-backend sh -c "composer install --no-dev --optimize-autoloader" || true
           docker compose up -d
           sleep 15
           echo "=== HEALTH CHECK ==="
